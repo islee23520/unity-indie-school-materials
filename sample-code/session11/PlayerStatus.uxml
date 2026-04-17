@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi:http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="PlayerStatus.uss" />
+    <ui:VisualElement name="player-panel" class="player-panel">
+        <ui:Label name="player-name" text="Player Name" class="name-label" />
+        <ui:VisualElement class="bar-container">
+            <ui:VisualElement name="hp-bg" class="bar-bg">
+                <ui:VisualElement name="hp-fill" class="hp-fill" />
+            </ui:VisualElement>
+            <ui:Label name="hp-text" text="100 / 100" class="bar-text" />
+        </ui:VisualElement>
+        <ui:Button name="damage-btn" text="Take Damage" class="action-button" />
+    </ui:VisualElement>
+</ui:UXML>

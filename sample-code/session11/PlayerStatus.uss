@@ -1,0 +1,53 @@
+.player-panel {
+    background-color: rgba(26, 26, 46, 0.8);
+    padding: 20px;
+    border-radius: 12px;
+    border-width: 2px;
+    border-color: #4ecdc4;
+    width: 300px;
+}
+
+.name-label {
+    color: #eee;
+    font-size: 24px;
+    -unity-font-style: bold;
+    margin-bottom: 10px;
+}
+
+.bar-container {
+    margin-bottom: 15px;
+}
+
+.bar-bg {
+    height: 20px;
+    background-color: #2d2d44;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.hp-fill {
+    height: 100%;
+    background-color: #ff6b6b;
+    width: 100%;
+}
+
+.bar-text {
+    color: #eee;
+    font-size: 14px;
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+}
+
+.action-button {
+    background-color: #4ecdc4;
+    color: #1a1a2e;
+    border-radius: 6px;
+    padding: 8px;
+    -unity-font-style: bold;
+    transition-duration: 0.2s;
+}
+
+.action-button:hover {
+    background-color: #ff6b6b;
+    scale: 1.05;
+}
