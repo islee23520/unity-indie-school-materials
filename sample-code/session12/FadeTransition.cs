@@ -1,39 +1,37 @@
-using System.Collections;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Metroidvania.Menu
 {
     [CreateAssetMenu(fileName = "FadeTransition", menuName = "Menu/Fade Transition")]
     public class FadeTransition : ScreenTransition
     {
-        public override IEnumerator AnimateIn(RectTransform screen)
+        public override async UniTask AnimateInAsync(VisualElement screen)
         {
-            CanvasGroup group = screen.GetComponent<CanvasGroup>();
-            if (group == null) group = screen.gameObject.AddComponent<CanvasGroup>();
-
+            screen.style.display = DisplayStyle.Flex;
+            screen.style.opacity = 0f;
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
-                group.alpha = elapsed / duration;
-                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+                screen.style.opacity = Mathf.Clamp01(elapsed / duration);
+                await UniTask.Yield(PlayerLoopTiming.Update);
             }
-            group.alpha = 1f;
+            screen.style.opacity = 1f;
         }
 
-        public override IEnumerator AnimateOut(RectTransform screen)
+        public override async UniTask AnimateOutAsync(VisualElement screen)
         {
-            CanvasGroup group = screen.GetComponent<CanvasGroup>();
-            if (group == null) group = screen.gameObject.AddComponent<CanvasGroup>();
-
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
-                group.alpha = 1f - (elapsed / duration);
-                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+                screen.style.opacity = 1f - Mathf.Clamp01(elapsed / duration);
+                await UniTask.Yield(PlayerLoopTiming.Update);
             }
-            group.alpha = 0f;
+            screen.style.opacity = 0f;
+            screen.style.display = DisplayStyle.None;
         }
     }
 }

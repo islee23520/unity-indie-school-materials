@@ -60,8 +60,9 @@ sample-code/
 
 ### 2. Integration
 Keep session folders stable so curriculum docs and markdown slide sources can point to a single canonical path.
-- **Canonical path**: `sample-code/sessionX/`
-- **Reference target**: `slides/` and `docs/` should point here when they need session-specific Unity examples.
+- **Canonical path inside the materials repo**: `sample-code/sessionX/`
+- **Parent repo access path**: `course-materials/sample-code/sessionX/`
+- **Reference target**: `course-materials/slides/` in the parent repo should point here when session-specific Unity examples are needed.
 
 ## Code Style Standards
 ```csharp
