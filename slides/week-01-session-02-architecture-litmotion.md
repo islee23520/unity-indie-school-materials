@@ -601,8 +601,13 @@ public class TweenExamples : MonoBehaviour {
 **복합 애니메이션**
 
 ```csharp
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+
 public class ComplexTween : MonoBehaviour {
-    async void Start() {
+    void Start() => RunSequenceAsync().Forget();
+
+    private async UniTask RunSequenceAsync() {
         // 순차 실행
         await LMotion.Create(Vector3.zero, Vector3.up, 0.5f)
             .BindToPosition(transform);

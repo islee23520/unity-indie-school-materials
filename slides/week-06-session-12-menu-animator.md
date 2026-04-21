@@ -68,21 +68,24 @@ public class MenuManager : MonoBehaviour
 ```csharp
 public abstract class MenuScreen : MonoBehaviour
 {
-    [SerializeField] protected RectTransform content;
-    [SerializeField] private bool hideOnStart = true;
-    
-    public bool IsVisible => content.gameObject.activeSelf;
+    [SerializeField] private string contentElementName;
+    protected VisualElement Content { get; private set; }
+
+    public void Bind(VisualElement root)
+    {
+        Content = root.Q<VisualElement>(contentElementName);
+    }
     
     public virtual void Show()
     {
-        content.gameObject.SetActive(true);
+        Content.style.display = DisplayStyle.Flex;
         OnShow();
     }
     
     public virtual void Hide()
     {
         OnHide();
-        content.gameObject.SetActive(false);
+        Content.style.display = DisplayStyle.None;
     }
     
     protected abstract void OnShow();
@@ -102,13 +105,9 @@ public abstract class MenuScreen : MonoBehaviour
 public abstract class ScreenTransition : ScriptableObject
 {
     [SerializeField] protected float duration = 0.5f;
-    [SerializeField] protected AnimationCurve easeCurve = 
-        AnimationCurve.EaseInOut(0, 0, 1, 1);
-    
-    public float Duration => duration;
-    
-    public abstract IEnumerator AnimateIn(RectTransform screen);
-    public abstract IEnumerator AnimateOut(RectTransform screen);
+
+    public abstract UniTask AnimateInAsync(VisualElement screen);
+    public abstract UniTask AnimateOutAsync(VisualElement screen);
 }
 ```
 
@@ -121,28 +120,26 @@ public abstract class ScreenTransition : ScriptableObject
     menuName = "Menu/Fade Transition")]
 public class FadeTransition : ScreenTransition
 {
-    public override IEnumerator AnimateIn(RectTransform screen)
+    public override async UniTask AnimateInAsync(VisualElement screen)
     {
-        CanvasGroup canvasGroup = screen.GetComponent<CanvasGroup>();
-        if (canvasGroup == null)
-            canvasGroup = screen.gameObject.AddComponent<CanvasGroup>();
-        
+        screen.style.display = DisplayStyle.Flex;
+        screen.style.opacity = 0f;
+
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            elapsed += Time.deltaTime;
-            float t = easeCurve.Evaluate(elapsed / duration);
-            canvasGroup.alpha = Mathf.Lerp(0f, 1f, t);
-            yield return null;
+            elapsed += Time.unscaledDeltaTime;
+            screen.style.opacity = Mathf.Clamp01(elapsed / duration);
+            await UniTask.Yield(PlayerLoopTiming.Update);
         }
-        canvasGroup.alpha = 1f;
+        screen.style.opacity = 1f;
     }
 }
 ```
 
 ---
 
-## 슬라이드 전환 구현
+## UI Toolkit 슬라이드 전환 구현
 
 ```csharp
 [CreateAssetMenu(fileName = "SlideTransition", 
@@ -151,33 +148,29 @@ public class SlideTransition : ScreenTransition
 {
     [SerializeField] private SlideDirection direction = SlideDirection.Right;
     
-    public override IEnumerator AnimateIn(RectTransform screen)
+    public override async UniTask AnimateInAsync(VisualElement screen)
     {
-        Vector2 startPos = GetStartPosition(screen);
-        Vector2 endPos = Vector2.zero;
-        
-        screen.anchoredPosition = startPos;
-        
+        screen.style.translate = new Translate(GetStartOffset(), 0);
+        screen.style.display = DisplayStyle.Flex;
+
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            elapsed += Time.deltaTime;
-            float t = easeCurve.Evaluate(elapsed / duration);
-            screen.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
-            yield return null;
+            elapsed += Time.unscaledDeltaTime;
+            float currentX = Mathf.Lerp(GetStartOffset(), 0f, elapsed / duration);
+            screen.style.translate = new Translate(currentX, 0);
+            await UniTask.Yield(PlayerLoopTiming.Update);
         }
-        screen.anchoredPosition = endPos;
+        screen.style.translate = new Translate(0, 0);
     }
     
-    Vector2 GetStartPosition(RectTransform screen)
+    float GetStartOffset()
     {
         return direction switch
         {
-            SlideDirection.Left => new Vector2(-screen.rect.width, 0),
-            SlideDirection.Right => new Vector2(screen.rect.width, 0),
-            SlideDirection.Up => new Vector2(0, screen.rect.height),
-            SlideDirection.Down => new Vector2(0, -screen.rect.height),
-            _ => Vector2.zero
+            SlideDirection.Left => -640f,
+            SlideDirection.Right => 640f,
+            _ => 0f
         };
     }
 }
@@ -190,36 +183,23 @@ public class SlideTransition : ScreenTransition
 ```csharp
 public class MenuManager : MonoBehaviour
 {
-    public void OpenScreen(string screenName, 
-        ScreenTransition transition = null)
+    public async UniTask OpenScreenAsync(string screenName)
     {
-        MenuScreen target = Array.Find(menuScreens, 
-            s => s.name == screenName);
-        if (target == null) return;
-        
-        transition ??= defaultTransition;
-        
-        if (currentScreen != null)
+        if (!_lookup.TryGetValue(screenName, out var target))
         {
-            StartCoroutine(SwitchScreens(currentScreen, target, transition));
+            return;
         }
-        else
+
+        if (_currentScreen != null)
         {
-            StartCoroutine(ShowScreen(target, transition));
+            await defaultTransition.AnimateOutAsync(_currentScreen.Content);
+            _currentScreen.Hide();
+            _history.Push(_currentScreen);
         }
-    }
-    
-    IEnumerator SwitchScreens(MenuScreen from, MenuScreen to, 
-        ScreenTransition transition)
-    {
-        yield return StartCoroutine(transition.AnimateOut(from.Content));
-        from.Hide();
-        
-        to.Show();
-        yield return StartCoroutine(transition.AnimateIn(to.Content));
-        
-        history.Push(from);
-        currentScreen = to;
+
+        _currentScreen = target;
+        _currentScreen.Show();
+        await defaultTransition.AnimateInAsync(_currentScreen.Content);
     }
 }
 ```

@@ -557,7 +557,7 @@ public class GameLevel : MonoBehaviour {
 ```csharp
 // Claude에게 질문:
 // "ScriptableObject와 JSON 파일의 장단점을 비교해줘"
-// "LitMotion vs DOTween 성능 비교"
+// "LitMotion 기반 패럴랙스 최적화 포인트 정리"
 ```
 
 **3. 데이터 관리 과제**

@@ -242,7 +242,7 @@ public class ObjectPool : MonoBehaviour
 
 ---
 
-## Unity 2021+ Object Pool
+## Unity 6.3 LTS ObjectPool
 
 ```csharp
 using UnityEngine.Pool;
@@ -378,7 +378,7 @@ public class EnemyFactory : MonoBehaviour
         enemy.transform.position = position;
         
         // AI 컴포넌트 초기화
-        BaseEnemyAI ai = enemy.GetComponent<BaseEnemyAI>();
+        EnemyAI ai = enemy.GetComponent<EnemyAI>();
         ai?.Initialize();
         
         return enemy;
@@ -430,8 +430,9 @@ public class SpawnManager : MonoBehaviour
         activeEnemies.Add(enemy);
         
         // 적 사망 이벤트 구독
-        enemy.GetComponent<Health>()?.onDeath.AddListener(() => 
-            OnEnemyDeath(enemy));
+        enemy.GetComponent<Health>()?.OnDeath
+            .Take(1)
+            .Subscribe(_ => OnEnemyDeath(enemy));
     }
 }
 ```
@@ -450,7 +451,7 @@ Unity 2D 게임용 범용 Object Pool 시스템을 만들어줘.
 요구사항:
 1. 제네릭 타입 지원
 2. 풀 크기 자동 확장
-3. Unity 2021+ ObjectPool 사용
+3. Unity 6.3 LTS 기본 ObjectPool 사용
 4. MonoBehaviour가 아닌 클래스도 지원
 5. 풀 통계 (활성/비활성 카운트) 제공
 

@@ -70,9 +70,9 @@ blockquote {
 - **C# API**: 코드로 UI 제어
 
 ```csharp
-// 기존 uGUI vs UI Toolkit
-// uGUI: Canvas + GameObject 기반
-// UI Toolkit: Document + Element 기반
+// 권장 스택: UI Toolkit + MVVM + R3
+// UI Toolkit: UIDocument + VisualElement 기반
+// Gameplay UI도 가능하면 같은 바인딩 패턴으로 통일
 ```
 
 **장점**
@@ -405,23 +405,30 @@ LMotion.Create(0f, 1f, 0.3f)
 
 ```csharp
 using LitMotion;
-using LitMotion.Extensions;
+using UnityEngine;
+using UnityEngine.UIElements;
 
 public class UIAnimator : MonoBehaviour
 {
-    [SerializeField] private RectTransform panel;
-    
+    [SerializeField] private UIDocument uiDocument;
+
     void AnimatePanel()
     {
-        // 페이드 인
+        VisualElement panel = uiDocument.rootVisualElement.Q<VisualElement>("main-panel");
+
         LMotion.Create(0f, 1f, 0.5f)
             .WithEase(Ease.OutQuad)
-            .BindToGraphicAlpha(panel.GetComponent<Image>());
-        
-        // 위치 이동
-        LMotion.Create(new Vector2(-500f, 0f), Vector2.zero, 0.5f)
+            .BindWithState(panel, (value, element) =>
+            {
+                element.style.opacity = value;
+            });
+
+        LMotion.Create(-500f, 0f, 0.5f)
             .WithEase(Ease.OutBack)
-            .BindToAnchoredPosition(panel);
+            .BindWithState(panel, (value, element) =>
+            {
+                element.style.translate = new Translate(value, 0);
+            });
     }
 }
 ```
@@ -654,7 +661,7 @@ LitMotion을 사용한 Unity UI 애니메이션 코드를 작성해줘.
 - MenuAnimationController 클래스
 - Button hover/click 이벤트 연결
 - LSequence 사용한 순차 애니메이션
-- DOTween 스타일 체이닝 메서드 활용
+- LitMotion 체이닝 메서드 활용
 
 [추가]
 - 애니메이션 재생 중 버튼 비활성화

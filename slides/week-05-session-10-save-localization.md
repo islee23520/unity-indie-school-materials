@@ -490,6 +490,7 @@ Window → Asset Management → Localization Tables
 ## 코드에서 Localization 사용
 
 ```csharp
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Settings;
@@ -502,13 +503,13 @@ public class LocalizationExample : MonoBehaviour
     void Start()
     {
         // 동적 문자열 가져오기
-        GetLocalizedString("UI_Text", "game_title");
+        GetLocalizedStringAsync("UI_Text", "game_title").Forget();
         
         // 언어 변경
         ChangeLanguage("en");
     }
     
-    public async void GetLocalizedString(string table, string key)
+    public async UniTask GetLocalizedStringAsync(string table, string key)
     {
         var stringOperation = LocalizationSettings
             .StringDatabase
@@ -588,29 +589,29 @@ public class UILocalization : MonoBehaviour
 
 ---
 
-## 텍스트 메시 자동 현지화
+## UI Toolkit Label 자동 현지화
 
 ```csharp
-using TMPro;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Localization.Components;
+using UnityEngine.Localization.Settings;
+using UnityEngine.UIElements;
 
-[RequireComponent(typeof(TextMeshProUGUI))]
-[RequireComponent(typeof(LocalizeStringEvent))]
-public class AutoLocalizedText : MonoBehaviour
+public class AutoLocalizedLabel : MonoBehaviour
 {
+    [SerializeField] private UIDocument uiDocument;
     [SerializeField] private string localizationKey;
-    
-    void Start()
+
+    private async UniTaskVoid Start()
     {
-        var localizeEvent = GetComponent<LocalizeStringEvent>();
-        var textComponent = GetComponent<TextMeshProUGUI>();
-        
-        localizeEvent.StringReference.SetReference("UI_Text", localizationKey);
-        localizeEvent.OnUpdateString.AddListener((localizedText) =>
-        {
-            textComponent.text = localizedText;
-        });
+        await LocalizationSettings.InitializationOperation.ToUniTask();
+
+        var titleLabel = uiDocument.rootVisualElement.Q<Label>("title-label");
+        string localizedText = await LocalizationSettings.StringDatabase
+            .GetLocalizedStringAsync("UI_Text", localizationKey)
+            .Task;
+
+        titleLabel.text = localizedText;
     }
 }
 ```

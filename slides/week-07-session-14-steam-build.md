@@ -332,7 +332,7 @@ public class BuildCommand {
 Unity.exe -quit -batchmode -projectPath "C:\\MyProject" -executeMethod BuildCommand.BuildWindows -logFile "build.log"
 
 # macOS
-/Applications/Unity/Hub/Editor/2022.3.20f1/Unity.app/Contents/MacOS/Unity \
+/Applications/Unity/Hub/Editor/6000.3.0f1/Unity.app/Contents/MacOS/Unity \
     -quit \
     -batchmode \
     -projectPath "/Users/dev/MyProject" \
@@ -380,7 +380,7 @@ public class AutoVersion : IPreprocessBuildWithReport {
 
 ```batch
 @echo off
-set UNITY_PATH="C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.20f1\\Editor\\Unity.exe"
+set UNITY_PATH="C:\\Program Files\\Unity\\Hub\\Editor\\6000.3.0f1\\Editor\\Unity.exe"
 set PROJECT_PATH="C:\\Projects\\MyGame"
 set BUILD_PATH="C:\\Builds"
 
@@ -403,7 +403,7 @@ pause
 ```bash
 #!/bin/bash
 
-UNITY_PATH="/Applications/Unity/Hub/Editor/2022.3.20f1/Unity.app/Contents/MacOS/Unity"
+UNITY_PATH="/Applications/Unity/Hub/Editor/6000.3.0f1/Unity.app/Contents/MacOS/Unity"
 PROJECT_PATH="$HOME/Projects/MyGame"
 BUILD_PATH="$HOME/Builds"
 
@@ -764,7 +764,7 @@ Steam Guard가 활성화된 경우 SDA(Steam Desktop Authenticator) 또는 ssfn 
 **목적: 멀티 플랫폼 빌드 Editor 스크립트 생성**
 
 ```
-Unity 2022.3 프로젝트용 멀티 플랫폼 빌드 Editor 스크립트를 작성해주세요.
+Unity 6.3 LTS 프로젝트용 멀티 플랫폼 빌드 Editor 스크립트를 작성해주세요.
 
 요구사항:
 - Windows 64bit, macOS, Linux 64bit 빌드 메서드
@@ -795,7 +795,7 @@ Unity 프로젝트용 GitHub Actions workflow를 작성해주세요.
 - 빌드 아티팩트 업로드
 - 태그 push 시 GitHub Release 자동 생성
 
-Unity 버전: 2022.3.20f1
+Unity 버전: 6000.3.0f1 (Unity 6.3 LTS)
 ```
 
 **기대 출력:**
@@ -841,7 +841,7 @@ Unity 프로젝트를 로컬에서 빌드하는 배치 스크립트를 작성해
 - 빌드 실패 시 오류 메시지 표시
 
 프로젝트 경로: 사용자 입력 또는 현재 디렉토리
-Unity 버전: 2022.3.20f1
+Unity 버전: 6000.3.0f1 (Unity 6.3 LTS)
 ```
 
 **기대 출력:**
@@ -878,7 +878,7 @@ IPreprocessBuildWithReport 인터페이스를 사용한 자동 버전 관리 스
 
 1. **구체적인 정보 제공**
    - Unity 버전, 플랫폼, 파일 경로 명시
-   - 예시: "Unity 2022.3.20f1", "Windows Standalone"
+   - 예시: "Unity 6.3 LTS (6000.3.0f1)", "Windows Standalone"
 
 2. **요구사항 목록화**
    - 번호 또는 글머리 기호로 정리

@@ -189,7 +189,7 @@ Unity용: OpenUPM 또는 Git URL
 - Zero-allocation (GC 없음)
 - Burst Compiler 지원
 - UniTask와 통합
-- DOTween보다 빠름
+- 실무용 경량 트윈 워크플로우 구성에 적합
 
 ---
 
