@@ -75,3 +75,5 @@ Assets/AddressableAssetsData/*.bin*
 *.html
 output/
 rendered/
+
+AGENTS.md
