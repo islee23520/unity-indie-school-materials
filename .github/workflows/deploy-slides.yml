@@ -1,0 +1,239 @@
+name: Deploy Slides to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'slides/**'
+      - '.github/workflows/deploy-slides.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Marp CLI
+        run: npm install -g @marp-team/marp-cli
+
+      - name: Convert slides to HTML
+        run: |
+          mkdir -p slides/html
+          for f in slides/*.md; do
+            name=$(basename "$f" .md)
+            echo "Converting: $name"
+            npx @marp-team/marp-cli "$f" --html -o "slides/html/${name}.html"
+          done
+
+      - name: Generate index page
+        run: |
+          cat > slides/html/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="ko">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Unity Indie School — 강의 슬라이드</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: #0d1117; color: #e6edf3; min-height: 100vh; padding: 2rem;
+            }
+            h1 {
+              text-align: center; font-size: 2rem; margin-bottom: 0.5rem;
+              background: linear-gradient(135deg, #58a6ff, #bc8cff);
+              -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            }
+            .subtitle { text-align: center; color: #8b949e; margin-bottom: 2rem; font-size: 0.95rem; }
+            .section-title {
+              font-size: 1.1rem; color: #58a6ff; margin: 2rem 0 0.75rem;
+              padding-bottom: 0.3rem; border-bottom: 1px solid #21262d;
+            }
+            .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+            .card {
+              background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+              padding: 1rem 1.25rem; text-decoration: none; color: #e6edf3;
+              transition: border-color 0.2s, transform 0.15s;
+              display: flex; flex-direction: column; gap: 0.3rem;
+            }
+            .card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+            .card .title { font-weight: 600; font-size: 1rem; }
+            .card .desc { font-size: 0.82rem; color: #8b949e; }
+            .badge {
+              display: inline-block; font-size: 0.7rem; padding: 2px 8px;
+              border-radius: 12px; background: #1f6feb33; color: #58a6ff; width: fit-content;
+            }
+            footer { text-align: center; margin-top: 3rem; color: #484f58; font-size: 0.8rem; }
+          </style>
+          </head>
+          <body>
+          <h1>🎮 Unity Indie School</h1>
+          <p class="subtitle">Metroidvania Course — Slide Deck Index</p>
+
+          <div class="section-title">📌 코스 개요</div>
+          <div class="grid">
+            <a class="card" href="course-overview.html">
+              <span class="badge">Overview</span>
+              <span class="title">Course Overview</span>
+              <span class="desc">전체 커리큘럼 소개 및 기술 스택 개관</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 1 — C# 기초 & 아키텍처</div>
+          <div class="grid">
+            <a class="card" href="week-01-session-01-csharp-unity.html">
+              <span class="badge">Session 1</span>
+              <span class="title">C# & Unity Fundamentals</span>
+              <span class="desc">C# 핵심 문법, Unity 구조, 스크립트 생명주기</span>
+            </a>
+            <a class="card" href="week-01-session-02-architecture-litmotion.html">
+              <span class="badge">Session 2</span>
+              <span class="title">Clean Architecture & LitMotion</span>
+              <span class="desc">VContainer DI, 클린 아키텍처, LitMotion 트윈</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 2 — Spine & 플레이어 컨트롤</div>
+          <div class="grid">
+            <a class="card" href="week-02-session-03-spine-litmotion.html">
+              <span class="badge">Session 3</span>
+              <span class="title">Spine & LitMotion Integration</span>
+              <span class="desc">Spine 4.2 캐릭터 애니메이션, LitMotion 연동</span>
+            </a>
+            <a class="card" href="week-02-session-04-playercontroller.html">
+              <span class="badge">Session 4</span>
+              <span class="title">Player Controller</span>
+              <span class="desc">입력 처리, 이동, 점프, 대시 시스템</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 3 — 타일맵 & AI</div>
+          <div class="grid">
+            <a class="card" href="week-03-session-05-tilemap-so.html">
+              <span class="badge">Session 5</span>
+              <span class="title">Tilemap & ScriptableObject</span>
+              <span class="desc">타일맵 레벨 디자인, ScriptableObject 데이터 관리</span>
+            </a>
+            <a class="card" href="week-03-session-06-navmesh-ai.html">
+              <span class="badge">Session 6</span>
+              <span class="title">NavMesh 2D AI</span>
+              <span class="desc">Unity NavMesh 2D, 적 AI 패트롤/추적</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 4 — 전투 & 오브젝트 풀링</div>
+          <div class="grid">
+            <a class="card" href="week-04-session-07-combat.html">
+              <span class="badge">Session 7</span>
+              <span class="title">Combat System</span>
+              <span class="desc">히트박스/허트박스, 데미지 파이프라인, 체력 시스템</span>
+            </a>
+            <a class="card" href="week-04-session-08-enemy-pooling.html">
+              <span class="badge">Session 8</span>
+              <span class="title">Enemy & Object Pooling</span>
+              <span class="desc">적 FSM, 오브젝트 풀링, VContainer 통합</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 5 — 어빌리티 & 세이브</div>
+          <div class="grid">
+            <a class="card" href="week-05-session-09-ability.html">
+              <span class="badge">Session 9</span>
+              <span class="title">Ability System</span>
+              <span class="desc">어빌리티 아키텍처, 상태 머신, 쿨다운</span>
+            </a>
+            <a class="card" href="week-05-session-10-save-localization.html">
+              <span class="badge">Session 10</span>
+              <span class="title">Save & Localization</span>
+              <span class="desc">세이브/로드, Unity Localization, VContainer DI</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 6 — UI/UX & 메뉴/애니메이터</div>
+          <div class="grid">
+            <a class="card" href="week-06-session-11-ui-mvvm.html">
+              <span class="badge">Session 11</span>
+              <span class="title">UI Toolkit & MVVM</span>
+              <span class="desc">UI Toolkit 뷰, MVVM 바인딩, R3 ReactiveProperty</span>
+            </a>
+            <a class="card" href="week-06-session-12-menu-animator.html">
+              <span class="badge">Session 12</span>
+              <span class="title">Menu & Animator</span>
+              <span class="desc">메뉴 시스템, 화면 전환, Spine 애니메이션 제어</span>
+            </a>
+          </div>
+
+          <div class="section-title">📅 Week 7 — 최적화 & 출시</div>
+          <div class="grid">
+            <a class="card" href="week-07-session-13-optimization.html">
+              <span class="badge">Session 13</span>
+              <span class="title">Optimization</span>
+              <span class="desc">프로파일링, 메모리 최적화, 로딩 파이프라인</span>
+            </a>
+            <a class="card" href="week-07-session-14-steam-build.html">
+              <span class="badge">Session 14</span>
+              <span class="title">Steam & Build</span>
+              <span class="desc">Steamworks.NET 연동, 빌드 파이프라인, 배포</span>
+            </a>
+          </div>
+
+          <div class="section-title">📎 보충 자료</div>
+          <div class="grid">
+            <a class="card" href="supplement-ai-coding-tools.html">
+              <span class="badge">Supplement</span>
+              <span class="title">AI 코딩 도구 & CLI vs GUI</span>
+              <span class="desc">CLI 툴 철학, AI 코딩 어시스턴트 소개</span>
+            </a>
+            <a class="card" href="supplement-ai-harnessing-tools.html">
+              <span class="badge">Supplement</span>
+              <span class="title">AI Harnessing — OMO / OMX / OMC</span>
+              <span class="desc">OpenCode(OMO), OpenCodeX(OMX), OpenCodeCanvas(OMC) 상세 가이드</span>
+            </a>
+            <a class="card" href="supplement-lux-guide.html">
+              <span class="badge">Supplement</span>
+              <span class="title">LUX — LLM-Powered Unix X</span>
+              <span class="desc">LUX 에이전트 프레임워크 상세 가이드</span>
+            </a>
+            <a class="card" href="supplement-wsl-setup-guide.html">
+              <span class="badge">Supplement</span>
+              <span class="title">WSL 설치 가이드</span>
+              <span class="desc">Windows Subsystem for Linux 개발 환경 구축</span>
+            </a>
+          </div>
+
+          <footer>Unity Indie School © 2026 — Course Materials</footer>
+          </body>
+          </html>
+          HTMLEOF
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: slides/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
