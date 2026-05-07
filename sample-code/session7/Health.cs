@@ -1,7 +1,7 @@
 using UnityEngine;
 using R3;
 using System;
-using System.Collections;
+using Cysharp.Threading.Tasks;
 
 namespace Metroidvania.Combat
 {
@@ -40,7 +40,7 @@ namespace Metroidvania.Combat
             }
             else
             {
-                StartCoroutine(InvincibilityCoroutine());
+                InvincibilityAsync().Forget();
             }
         }
 
@@ -56,25 +56,24 @@ namespace Metroidvania.Combat
             Debug.Log($"{gameObject.name} died!");
         }
 
-        private IEnumerator InvincibilityCoroutine()
+        private async UniTaskVoid InvincibilityAsync()
         {
             isInvincible = true;
 
             if (spriteRenderer != null)
             {
-                float elapsed = 0f;
-                while (elapsed < invincibilityDuration)
+                int blinkCount = Mathf.CeilToInt(invincibilityDuration / 0.2f);
+                for (int i = 0; i < blinkCount; i++)
                 {
                     spriteRenderer.color = new Color(1, 1, 1, 0.5f);
-                    yield return new WaitForSeconds(0.1f);
+                    await UniTask.Delay(100);
                     spriteRenderer.color = Color.white;
-                    yield return new WaitForSeconds(0.1f);
-                    elapsed += 0.2f;
+                    await UniTask.Delay(100);
                 }
             }
             else
             {
-                yield return new WaitForSeconds(invincibilityDuration);
+                await UniTask.Delay((int)(invincibilityDuration * 1000));
             }
 
             isInvincible = false;

@@ -227,27 +227,33 @@ public class SaveManager : MonoBehaviour
 
 ```csharp
 using System.IO;
-using UnityEngine;
+using VContainer;
+using VContainer.Unity;
 
-public class SaveManager : MonoBehaviour
+public class SaveManager : IStartable
 {
-    public static SaveManager Instance;
-    private string saveFileName = "metroidvania_save.json";
-    
-    void Awake()
+    private readonly string _saveFileName = "metroidvania_save.json";
+    private string _savePath;
+
+    public void Start()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else Destroy(gameObject);
+        _savePath = Path.Combine(
+            UnityEngine.Application.persistentDataPath,
+            _saveFileName);
     }
-    
-    private string GetSavePath()
+
+    public string GetSavePath() => _savePath;
+}
+
+public class SaveLifetimeScope : LifetimeScope
+{
+    protected override void Configure(IContainerBuilder builder)
     {
-        return Path.Combine(Application.persistentDataPath, saveFileName);
+        builder.Register<SaveManager>(Lifetime.Singleton)
+            .AsImplementedInterfaces()
+            .AsSelf();
     }
+}
 ```
 
 ---
@@ -398,31 +404,35 @@ public class AchievementData
 ## 사용 예시
 
 ```csharp
+using VContainer;
+
 public class GameManager : MonoBehaviour
 {
+    [Inject] private SaveManager _saveManager;
+
     public MetroidvaniaSaveData CurrentData { get; private set; }
-    
+
     void Start()
     {
         LoadGame();
     }
-    
+
     public void SaveGame()
     {
         CurrentData.currentScene = SceneLoader.Instance.CurrentSceneName;
         CurrentData.totalPlayTime += Time.time;
-        
-        SaveManager.Instance.SaveGame(CurrentData);
+
+        _saveManager.SaveGame(CurrentData);
     }
-    
+
     public void LoadGame()
     {
-        CurrentData = SaveManager.Instance.LoadGame();
-        
+        CurrentData = _saveManager.LoadGame();
+
         // UI 업데이트
         UIManager.Instance.UpdateSaveSlot(CurrentData.currentScene, CurrentData.totalPlayTime);
     }
-    
+
     void OnApplicationPause(bool pause)
     {
         if (pause) SaveGame(); // 백그라운드 진입 시 자동 저장
@@ -849,7 +859,7 @@ GAME_START,게임 시작,Start Game,ゲーム開始,开始游戏
 
 ## 실습 체크리스트
 
-- [ ] SaveManager 싱글톤 구현
+- [ ] SaveManager VContainer 등록
 - [ ] 게임 데이터 JSON 저장 확인
 - [ ] Localization 패키지 설치
 - [ ] 4개 언어 Locale 설정

@@ -163,6 +163,10 @@ public class PlayerJumpController : MonoBehaviour
 
 ## 더블 점프 구현 코드
 
+Update 기반 구현과 R3 구독 기반 구현을 함께 비교합니다.
+
+### Update() 기반
+
 ```csharp
 using UnityEngine;
 
@@ -170,21 +174,100 @@ public class PlayerJumpController : MonoBehaviour
 {
     // 필드 생략
 
+    private int _jumpCount;
+
     public void SetDoubleJumpUnlocked(bool unlocked)
     {
         _maxJumpCount = unlocked ? 2 : 1;
     }
 
-    void Update()
+    private void Update()
     {
         if (IsGrounded())
+        {
             _jumpCount = 0;
+        }
 
         if (Input.GetKeyDown(KeyCode.Space) && _jumpCount < _maxJumpCount)
         {
-            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-            _jumpCount++;
+            Jump();
         }
+    }
+
+    private void Jump()
+    {
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+        _jumpCount++;
+    }
+
+    private bool IsGrounded()
+        => Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundMask);
+}
+```
+
+### R3 구독 기반
+
+```csharp
+using R3;
+using UnityEngine;
+
+public class PlayerJumpController : MonoBehaviour
+{
+    // 필드 생략
+
+    private enum JumpState
+    {
+        Grounded,
+        Airborne
+    }
+
+    private readonly ReactiveProperty<JumpState> _jumpState = new(JumpState.Grounded);
+    private readonly ReactiveProperty<int> _jumpCount = new(0);
+
+    public void SetDoubleJumpUnlocked(bool unlocked)
+    {
+        _maxJumpCount = unlocked ? 2 : 1;
+    }
+
+    private void Start()
+    {
+        Observable.EveryUpdate()
+            .Subscribe(_ => TransitionTo(IsGrounded() ? JumpState.Grounded : JumpState.Airborne))
+            .AddTo(this);
+
+        _jumpState
+            .DistinctUntilChanged()
+            .Where(state => state == JumpState.Grounded)
+            .Subscribe(_ => _jumpCount.Value = 0)
+            .AddTo(this);
+
+        Observable.EveryUpdate()
+            .Where(_ => Input.GetKeyDown(KeyCode.Space))
+            .Where(_ => CanJump())
+            .Subscribe(_ => Jump())
+            .AddTo(this);
+    }
+
+    private bool CanJump()
+    {
+        if (_jumpState.Value == JumpState.Grounded)
+        {
+            return true;
+        }
+
+        return _jumpState.Value == JumpState.Airborne && _jumpCount.Value < _maxJumpCount;
+    }
+
+    private void Jump()
+    {
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+        _jumpCount.Value++;
+        TransitionTo(JumpState.Airborne);
+    }
+
+    private void TransitionTo(JumpState nextState)
+    {
+        _jumpState.Value = nextState;
     }
 
     private bool IsGrounded()
@@ -217,6 +300,8 @@ public class DashSettings
 
 ## LitMotion 대시 구현
 
+https://annulusgames.github.io/LitMotion/
+
 ```csharp
 using LitMotion;
 using UnityEngine;
@@ -227,21 +312,30 @@ public class PlayerDashController : MonoBehaviour
     private bool _isDashing;
     private float _lastDashTime = -999f;
 
+    public float distance = 5f;
+    public float duration = 0.3f;
+    public float cooldown = 2f;
+
+    public void Start()
+    {
+        TryDash(Vector2.right); // 예시: 오른쪽으로 대시
+    }
+
     public bool TryDash(Vector2 direction)
     {
         if (_isDashing) return false;
-        if (Time.time - _lastDashTime < dash.cooldown) return false;
+        if (Time.time - _lastDashTime < cooldown) return false;
 
         var start = (Vector2)transform.position;
-        var end = start + direction.normalized * dash.distance;
+        var end = start + direction.normalized * distance;
         _isDashing = true;
         _lastDashTime = Time.time;
 
-        LMotion.Create(start, end, dash.duration)
+        LMotion.Create(start, end, duration)
+            .WithOnComplete(() => _isDashing = false)
             .WithEase(Ease.OutCubic)
             .Bind(value => transform.position = value)
-            .AddTo(gameObject)
-            .WithOnComplete(() => _isDashing = false);
+            .AddTo(gameObject);
 
         return true;
     }

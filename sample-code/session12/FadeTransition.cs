@@ -1,4 +1,6 @@
 using Cysharp.Threading.Tasks;
+using LitMotion;
+using LitMotion.Extensions;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -11,26 +13,20 @@ namespace Metroidvania.Menu
         {
             screen.style.display = DisplayStyle.Flex;
             screen.style.opacity = 0f;
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                screen.style.opacity = Mathf.Clamp01(elapsed / duration);
-                await UniTask.Yield(PlayerLoopTiming.Update);
-            }
-            screen.style.opacity = 1f;
+
+            await LMotion.Create(0f, 1f, duration)
+                .WithEase(Ease.OutQuad)
+                .BindWithState(screen, (value, element) => element.style.opacity = value)
+                .ToUniTask();
         }
 
         public override async UniTask AnimateOutAsync(VisualElement screen)
         {
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                screen.style.opacity = 1f - Mathf.Clamp01(elapsed / duration);
-                await UniTask.Yield(PlayerLoopTiming.Update);
-            }
-            screen.style.opacity = 0f;
+            await LMotion.Create(1f, 0f, duration)
+                .WithEase(Ease.OutQuad)
+                .BindWithState(screen, (value, element) => element.style.opacity = value)
+                .ToUniTask();
+
             screen.style.display = DisplayStyle.None;
         }
     }

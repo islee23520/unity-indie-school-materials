@@ -3,6 +3,7 @@ using UnityEngine.UIElements;
 using R3;
 using LitMotion;
 using LitMotion.Extensions;
+using VContainer;
 
 namespace Metroidvania.UI
 {
@@ -12,7 +13,10 @@ namespace Metroidvania.UI
     public class PlayerUIView : MonoBehaviour
     {
         [SerializeField] private UIDocument uiDocument;
-        private PlayerViewModel _viewModel;
+
+        [Inject]
+        private readonly PlayerViewModel _viewModel;
+
         private readonly CompositeDisposable _disposables = new();
 
         private VisualElement _hpFill;
@@ -22,7 +26,6 @@ namespace Metroidvania.UI
 
         private void Start()
         {
-            _viewModel = new PlayerViewModel();
             var root = uiDocument.rootVisualElement;
 
             _hpFill = root.Q<VisualElement>("hp-fill");
@@ -40,7 +43,7 @@ namespace Metroidvania.UI
                     float targetWidth = percent * 100f;
                     LMotion.Create(_hpFill.style.width.value.value, targetWidth, 0.3f)
                         .WithEase(Ease.OutQuad)
-                        .BindWithState(_hpFill, (v, element) => 
+                        .BindWithState(_hpFill, (v, element) =>
                         {
                             element.style.width = Length.Percent(v);
                         })

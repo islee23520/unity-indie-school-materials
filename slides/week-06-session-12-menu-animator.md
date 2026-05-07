@@ -8,8 +8,9 @@
 
 # 학습 목표
 
-- Unity UI 기반 메뉴 시스템 설계
-- 화면 전환 효과 구현
+- UI Toolkit 기반 메뉴 화면을 VContainer DI로 조립
+- R3 ViewModel로 현재 화면과 뒤로가기 상태 관리
+- LitMotion 트윈으로 화면 전환 효과 구현
 - Animator Override Controller 활용
 - 런타임 본 조작으로 동적 애니메이션
 - AI 프롬프트로 애니메이션 에셋 생성
@@ -22,74 +23,124 @@
 
 ## 메뉴 시스템 아키텍처
 
-```
-┌─────────────────────────────────────┐
-│         MenuManager (Singleton)     │
-│  - 현재 화면 추적                    │
-│  - 화면 전환 관리                    │
-│  - 히스토리 스택 관리                 │
-└─────────────┬───────────────────────┘
-              │
-    ┌─────────┼─────────┐
-    ▼         ▼         ▼
-┌───────┐ ┌───────┐ ┌───────┐
-│ Main  │ │ Shop  │ │Pause  │
-│Menu   │ │Screen │ │Menu   │
-└───────┘ └───────┘ └───────┘
+```text
+┌──────────────────────────────────────┐
+│      MenuLifetimeScope (VContainer)  │
+│  ┌────────────┐  ┌───────────────┐  │
+│  │ MenuManager│  │ MenuViewModel │  │
+│  │ (Presenter)│  │ (R3 State)    │  │
+│  └─────┬──────┘  └───────┬───────┘  │
+│        │                 │          │
+│   ┌────┼─────────┐       │          │
+│   ▼    ▼         ▼       │          │
+│ ┌───┐┌───┐┌───┐   │          │
+│ │Main││Shop││Pause│ ◄─┘          │
+│ └───┘└───┘└───┘              │
+└──────────────────────────────────────┘
 ```
 
 ---
 
-## MenuManager 기본 구조
+## MenuViewModel + MenuManager (MVVM)
 
 ```csharp
-public class MenuManager : MonoBehaviour
+// MenuViewModel: R3 반응형 상태 관리
+public sealed class MenuViewModel : IDisposable
 {
-    public static MenuManager Instance { get; private set; }
-    
-    [SerializeField] private MenuScreen[] menuScreens;
-    [SerializeField] private ScreenTransition defaultTransition;
-    
-    private Stack<MenuScreen> history = new();
-    private MenuScreen currentScreen;
-    
-    void Awake()
+    private readonly Stack<string> _history = new();
+    private readonly ReactiveProperty<int> _historyCount = new(0);
+
+    public ReactiveProperty<string> CurrentScreenName { get; } = new(string.Empty);
+    public ReadOnlyReactiveProperty<bool> CanGoBack { get; }
+
+    public MenuViewModel()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        CanGoBack = _historyCount
+            .Select(count => count > 0)
+            .ToReadOnlyReactiveProperty();
+    }
+
+    public void RequestOpen(string screenName)
+    {
+        // 히스토리 push + 상태 변경
+    }
+
+    public void RequestBack()
+    {
+        // 히스토리 pop + 상태 변경
     }
 }
 ```
 
 ---
 
-## MenuScreen 기본 클래스
+## MenuManager Presenter
 
 ```csharp
-public abstract class MenuScreen : MonoBehaviour
+// MenuManager: VContainer IStartable Presenter
+public sealed class MenuManager : IStartable, IDisposable
 {
-    [SerializeField] private string contentElementName;
-    protected VisualElement Content { get; private set; }
-
-    public void Bind(VisualElement root)
+    [Inject]
+    public MenuManager(
+        UIDocument uiDocument,
+        IReadOnlyList<IMenuScreen> menuScreens,
+        ScreenTransition defaultTransition,
+        MenuViewModel viewModel)
     {
-        Content = root.Q<VisualElement>(contentElementName);
+        // DI로 UI 문서, 화면 목록, 전환, ViewModel 주입
     }
-    
-    public virtual void Show()
+
+    public void Start()
+    {
+        // 화면 바인딩 + ViewModel 구독
+        _viewModel.CurrentScreenName
+            .Subscribe(screenName => OpenScreenAsync(screenName).Forget())
+            .AddTo(ref _disposables);
+    }
+}
+```
+
+---
+
+## IMenuScreen + MenuScreenDefinition
+
+```csharp
+// 화면 인터페이스 (VContainer 등록용)
+public interface IMenuScreen
+{
+    string ScreenName { get; }
+    string ContentElementName { get; }
+    VisualElement Content { get; }
+    void Bind(VisualElement content);
+    void Show();
+    void Hide();
+}
+
+// 직렬화 가능한 화면 정의 (LifetimeScope에 [SerializeField]로 등록)
+[Serializable]
+public sealed class MenuScreenDefinition : IMenuScreen
+{
+    [SerializeField] private string screenName;
+    [SerializeField] private string contentElementName;
+
+    public string ScreenName => screenName;
+    public string ContentElementName => contentElementName;
+    public VisualElement Content { get; private set; }
+
+    public void Bind(VisualElement content)
+    {
+        Content = content;
+    }
+
+    public void Show()
     {
         Content.style.display = DisplayStyle.Flex;
-        OnShow();
     }
-    
-    public virtual void Hide()
+
+    public void Hide()
     {
-        OnHide();
         Content.style.display = DisplayStyle.None;
     }
-    
-    protected abstract void OnShow();
-    protected abstract void OnHide();
 }
 ```
 
@@ -116,8 +167,7 @@ public abstract class ScreenTransition : ScriptableObject
 ## 페이드 전환 구현
 
 ```csharp
-[CreateAssetMenu(fileName = "FadeTransition", 
-    menuName = "Menu/Fade Transition")]
+[CreateAssetMenu(fileName = "FadeTransition", menuName = "Menu/Fade Transition")]
 public class FadeTransition : ScreenTransition
 {
     public override async UniTask AnimateInAsync(VisualElement screen)
@@ -125,46 +175,59 @@ public class FadeTransition : ScreenTransition
         screen.style.display = DisplayStyle.Flex;
         screen.style.opacity = 0f;
 
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            screen.style.opacity = Mathf.Clamp01(elapsed / duration);
-            await UniTask.Yield(PlayerLoopTiming.Update);
-        }
-        screen.style.opacity = 1f;
+        await LMotion.Create(0f, 1f, duration)
+            .WithEase(Ease.OutQuad)
+            .BindWithState(screen, (value, element) => element.style.opacity = value)
+            .ToUniTask();
+    }
+
+    public override async UniTask AnimateOutAsync(VisualElement screen)
+    {
+        await LMotion.Create(1f, 0f, duration)
+            .WithEase(Ease.OutQuad)
+            .BindWithState(screen, (value, element) => element.style.opacity = value)
+            .ToUniTask();
+
+        screen.style.display = DisplayStyle.None;
     }
 }
 ```
 
 ---
 
-## UI Toolkit 슬라이드 전환 구현
+## 슬라이드 전환 구현
 
 ```csharp
-[CreateAssetMenu(fileName = "SlideTransition", 
-    menuName = "Menu/Slide Transition")]
-public class SlideTransition : ScreenTransition
+[CreateAssetMenu(fileName = "SlideTransition", menuName = "Menu/Slide Transition")]
+public sealed class SlideTransition : ScreenTransition
 {
     [SerializeField] private SlideDirection direction = SlideDirection.Right;
-    
+
     public override async UniTask AnimateInAsync(VisualElement screen)
     {
-        screen.style.translate = new Translate(GetStartOffset(), 0);
         screen.style.display = DisplayStyle.Flex;
+        screen.style.translate = new Translate(GetStartOffset(), 0);
 
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float currentX = Mathf.Lerp(GetStartOffset(), 0f, elapsed / duration);
-            screen.style.translate = new Translate(currentX, 0);
-            await UniTask.Yield(PlayerLoopTiming.Update);
-        }
+        await LMotion.Create(GetStartOffset(), 0f, duration)
+            .WithEase(Ease.OutQuad)
+            .BindWithState(screen, (value, element) =>
+                element.style.translate = new Translate(value, 0))
+            .ToUniTask();
+    }
+
+    public override async UniTask AnimateOutAsync(VisualElement screen)
+    {
+        await LMotion.Create(0f, GetStartOffset(), duration)
+            .WithEase(Ease.OutQuad)
+            .BindWithState(screen, (value, element) =>
+                element.style.translate = new Translate(value, 0))
+            .ToUniTask();
+
+        screen.style.display = DisplayStyle.None;
         screen.style.translate = new Translate(0, 0);
     }
-    
-    float GetStartOffset()
+
+    private float GetStartOffset()
     {
         return direction switch
         {
@@ -181,25 +244,65 @@ public class SlideTransition : ScreenTransition
 ## MenuManager 전환 메서드
 
 ```csharp
-public class MenuManager : MonoBehaviour
+public sealed class MenuManager : IStartable, IDisposable
 {
-    public async UniTask OpenScreenAsync(string screenName)
+    private readonly Dictionary<string, IMenuScreen> _lookup = new();
+    private readonly DisposableBag _disposables = new();
+
+    [Inject]
+    public MenuManager(
+        UIDocument uiDocument,
+        IReadOnlyList<IMenuScreen> menuScreens,
+        ScreenTransition defaultTransition,
+        MenuViewModel viewModel)
     {
-        if (!_lookup.TryGetValue(screenName, out var target))
+        // DI로 필요한 의존성을 받는다
+    }
+
+    public void Start()
+    {
+        _root = _uiDocument.rootVisualElement;
+
+        foreach (IMenuScreen screen in _menuScreens)
         {
-            return;
+            VisualElement content = _root.Q<VisualElement>(screen.ContentElementName);
+            screen.Bind(content);
+            screen.Hide();
+            _lookup[screen.ScreenName] = screen;
         }
 
-        if (_currentScreen != null)
+        // ViewModel 상태 변화 → 화면 전환
+        _viewModel.CurrentScreenName
+            .Subscribe(screenName => OpenScreenAsync(screenName).Forget())
+            .AddTo(ref _disposables);
+    }
+}
+```
+
+---
+
+## MenuLifetimeScope 설정
+
+```csharp
+public sealed class MenuLifetimeScope : LifetimeScope
+{
+    [SerializeField] private UIDocument uiDocument;
+    [SerializeField] private ScreenTransition defaultTransition;
+    [SerializeField] private MenuScreenDefinition[] menuScreens;
+
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.RegisterInstance(uiDocument);
+        builder.RegisterInstance(defaultTransition);
+
+        foreach (MenuScreenDefinition screen in menuScreens)
         {
-            await defaultTransition.AnimateOutAsync(_currentScreen.Content);
-            _currentScreen.Hide();
-            _history.Push(_currentScreen);
+            builder.RegisterInstance(screen).As<IMenuScreen>();
         }
 
-        _currentScreen = target;
-        _currentScreen.Show();
-        await defaultTransition.AnimateInAsync(_currentScreen.Content);
+        builder.RegisterInstance<IReadOnlyList<IMenuScreen>>(menuScreens);
+        builder.Register<MenuViewModel>(Lifetime.Singleton);
+        builder.RegisterEntryPoint<MenuManager>();
     }
 }
 ```
@@ -231,24 +334,30 @@ public class MenuManager : MonoBehaviour
 ## 런타임 클립 교체
 
 ```csharp
-public class CharacterAnimator : MonoBehaviour
+public sealed class CharacterSkinChanger : MonoBehaviour
 {
-    [SerializeField] private Animator animator;
-    [SerializeField] private RuntimeAnimatorController baseController;
-    
-    private AnimatorOverrideController overrideController;
-    
-    void Start()
+    private Animator _animator;
+    private CharacterSkinSettings _settings;
+    private AnimatorOverrideController _overrideController;
+
+    [Inject]
+    public void Construct(Animator animator, CharacterSkinSettings settings)
     {
-        // Override Controller 생성
-        overrideController = new AnimatorOverrideController(baseController);
-        animator.runtimeAnimatorController = overrideController;
+        _animator = animator;
+        _settings = settings;
     }
-    
-    public void ReplaceIdleAnimation(AnimationClip newIdleClip)
+
+    private void Start()
     {
-        // "Idle" 상태의 클립을 교체
-        overrideController["Idle"] = newIdleClip;
+        _overrideController = new AnimatorOverrideController(_settings.BaseController);
+        _animator.runtimeAnimatorController = _overrideController;
+    }
+
+    public void ChangeSkin(AnimationClip idleClip, AnimationClip walkClip, AnimationClip attackClip)
+    {
+        _overrideController["Idle"] = idleClip;
+        _overrideController["Walk"] = walkClip;
+        _overrideController["Attack"] = attackClip;
     }
 }
 ```
@@ -258,33 +367,49 @@ public class CharacterAnimator : MonoBehaviour
 ## 무기별 애니메이션 교체
 
 ```csharp
-public class WeaponAnimationSystem : MonoBehaviour
+public sealed class WeaponAnimationSystem : MonoBehaviour, IDisposable
 {
-    [SerializeField] private WeaponData[] weapons;
-    [SerializeField] private Animator animator;
-    
-    private AnimatorOverrideController overrideController;
-    private Dictionary<string, AnimationClip> originalClips = new();
-    
-    void Start()
+    private readonly CompositeDisposable _disposables = new();
+    private Animator _animator;
+    private WeaponAnimationSettings _settings;
+    private AnimatorOverrideController _overrideController;
+
+    public ReactiveProperty<WeaponType> CurrentWeapon { get; } = new(WeaponType.None);
+
+    [Inject]
+    public void Construct(Animator animator, WeaponAnimationSettings settings)
     {
-        overrideController = new AnimatorOverrideController(
-            animator.runtimeAnimatorController);
-        animator.runtimeAnimatorController = overrideController;
-        
-        // 원본 클립 저장
-        SaveOriginalClips();
+        _animator = animator;
+        _settings = settings;
     }
-    
+
+    private void Start()
+    {
+        _overrideController = new AnimatorOverrideController(_animator.runtimeAnimatorController);
+        _animator.runtimeAnimatorController = _overrideController;
+
+        CurrentWeapon
+            .Where(type => type != WeaponType.None)
+            .Subscribe(ApplyWeaponAnimation)
+            .AddTo(_disposables);
+    }
+
     public void EquipWeapon(WeaponType type)
     {
-        WeaponData weapon = Array.Find(weapons, w => w.Type == type);
-        if (weapon == null) return;
-        
-        // 각 상태별 클립 교체
-        overrideController["Attack"] = weapon.AttackClip;
-        overrideController["Idle_Combat"] = weapon.IdleClip;
-        overrideController["Reload"] = weapon.ReloadClip;
+        CurrentWeapon.Value = type;
+    }
+
+    private void ApplyWeaponAnimation(WeaponType type)
+    {
+        WeaponData weapon = Array.Find(_settings.Weapons, item => item.Type == type);
+        if (weapon == null)
+        {
+            return;
+        }
+
+        _overrideController["Attack"] = weapon.AttackClip;
+        _overrideController["Idle_Combat"] = weapon.IdleClip;
+        _overrideController["Reload"] = weapon.ReloadClip;
     }
 }
 ```
@@ -294,14 +419,23 @@ public class WeaponAnimationSystem : MonoBehaviour
 ## ScriptableObject로 무기 데이터 관리
 
 ```csharp
-[CreateAssetMenu(fileName = "WeaponData", menuName = "Game/Weapon")]
-public class WeaponData : ScriptableObject
+public enum WeaponType
 {
-    public string weaponName;
+    None,
+    Sword,
+    Dagger,
+    Bow,
+    Staff,
+}
+
+[CreateAssetMenu(fileName = "WeaponData", menuName = "Game/Weapon")]
+public sealed class WeaponData : ScriptableObject
+{
+    public string WeaponName;
     public WeaponType Type;
-    public float damage;
-    public float attackSpeed;
-    
+    public float Damage;
+    public float AttackSpeed;
+
     [Header("Animations")]
     public AnimationClip IdleClip;
     public AnimationClip AttackClip;
@@ -334,29 +468,32 @@ public class WeaponData : ScriptableObject
 ## 본 캐싱 최적화
 
 ```csharp
-public class BoneController : MonoBehaviour
+public sealed class BoneController : MonoBehaviour
 {
-    private Animator animator;
-    private Transform headBone;
-    private Transform rightHandBone;
-    private Transform spineBone;
-    
-    // 본 해시 ID (성능 최적화)
-    private readonly int headHash = Animator.StringToHash("Head");
-    private readonly int rightHandHash = Animator.StringToHash("RightHand");
-    
-    void Start()
+    private readonly int _headHash = Animator.StringToHash("Head");
+    private readonly int _rightHandHash = Animator.StringToHash("RightHand");
+    private Animator _animator;
+
+    public Transform HeadBone { get; private set; }
+    public Transform RightHandBone { get; private set; }
+    public Transform SpineBone { get; private set; }
+
+    [Inject]
+    public void Construct(Animator animator)
     {
-        animator = GetComponent<Animator>();
+        _animator = animator;
+    }
+
+    private void Start()
+    {
         CacheBones();
     }
-    
-    void CacheBones()
+
+    private void CacheBones()
     {
-        // GetBoneTransform으로 주요 본 캐싱
-        headBone = animator.GetBoneTransform(HumanBodyBones.Head);
-        rightHandBone = animator.GetBoneTransform(HumanBodyBones.RightHand);
-        spineBone = animator.GetBoneTransform(HumanBodyBones.Spine);
+        HeadBone = _animator.GetBoneTransform(HumanBodyBones.Head);
+        RightHandBone = _animator.GetBoneTransform(HumanBodyBones.RightHand);
+        SpineBone = _animator.GetBoneTransform(HumanBodyBones.Spine);
     }
 }
 ```
@@ -366,34 +503,42 @@ public class BoneController : MonoBehaviour
 ## 머리 방향 제어 (Look At)
 
 ```csharp
-public class HeadTracking : MonoBehaviour
+public sealed class HeadTracking : MonoBehaviour
 {
-    [SerializeField] private Transform target;
-    [SerializeField] private float rotationSpeed = 5f;
-    [SerializeField] private float maxRotationAngle = 60f;
-    
-    private Transform headBone;
-    private Quaternion initialRotation;
-    
-    void OnAnimatorIK(int layerIndex)
+    private Transform _target;
+    private HeadTrackingSettings _settings;
+    private Transform _headBone;
+    private Quaternion _initialRotation;
+    private MotionHandle _rotationHandle;
+
+    [Inject]
+    public void Construct(Animator animator, Transform target, HeadTrackingSettings settings)
     {
-        if (target == null) return;
-        
-        // 목표 방향 계산
-        Vector3 direction = target.position - headBone.position;
-        direction.y = 0; // Y축 회전만
-        
+        _target = target;
+        _settings = settings;
+        _headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+        _initialRotation = _headBone.rotation;
+    }
+
+    private void OnAnimatorIK(int layerIndex)
+    {
+        Vector3 direction = _target.position - _headBone.position;
+        direction.y = 0f;
+
         // 각도 제한
         float angle = Vector3.SignedAngle(transform.forward, direction, Vector3.up);
-        angle = Mathf.Clamp(angle, -maxRotationAngle, maxRotationAngle);
-        
-        // 부드러운 회전
-        Quaternion targetRotation = Quaternion.Euler(0, angle, 0) * initialRotation;
-        headBone.rotation = Quaternion.Slerp(
-            headBone.rotation, 
-            targetRotation, 
-            rotationSpeed * Time.deltaTime
-        );
+        angle = Mathf.Clamp(angle, -_settings.MaxRotationAngle, _settings.MaxRotationAngle);
+
+        Quaternion targetRotation = Quaternion.Euler(0f, angle, 0f) * _initialRotation;
+        if (_rotationHandle.IsActive())
+        {
+            _rotationHandle.Cancel();
+        }
+
+        _rotationHandle = LMotion.Create(_headBone.rotation, targetRotation, _settings.RotationDuration)
+            .WithEase(Ease.OutQuad)
+            .WithOnUpdate(value => _headBone.rotation = value)
+            .RunWithoutBinding();
     }
 }
 ```
@@ -427,7 +572,7 @@ public class WeaponAttachment : MonoBehaviour
         attachedWeapon.localScale = Vector3.one;
     }
     
-    // 런타ime에 위치 미세 조정
+    // 런타임에 위치 미세 조정
     public void AdjustWeaponPosition(Vector3 newOffset)
     {
         positionOffset = newOffset;
@@ -442,44 +587,48 @@ public class WeaponAttachment : MonoBehaviour
 ## IK로 발 위치 보정
 
 ```csharp
-public class FootIK : MonoBehaviour
+public sealed class FootIK : MonoBehaviour
 {
-    [SerializeField] private float rayDistance = 1f;
-    [SerializeField] private LayerMask groundLayer;
-    [SerializeField] private float footOffset = 0.1f;
-    
-    private Animator animator;
-    
-    void OnAnimatorIK(int layerIndex)
+    private Animator _animator;
+    private FootIKSettings _settings;
+
+    [Inject]
+    public void Construct(Animator animator, FootIKSettings settings)
     {
-        // 왼발 IK
+        _animator = animator;
+        _settings = settings;
+    }
+
+    private void OnAnimatorIK(int layerIndex)
+    {
         AdjustFootIK(AvatarIKGoal.LeftFoot, AvatarIKHint.LeftKnee);
-        
-        // 오른발 IK
         AdjustFootIK(AvatarIKGoal.RightFoot, AvatarIKHint.RightKnee);
     }
-    
-    void AdjustFootIK(AvatarIKGoal foot, AvatarIKHint knee)
+
+    private void AdjustFootIK(AvatarIKGoal foot, AvatarIKHint knee)
     {
-        // 현재 발 위치에서 아래로 Raycast
-        Vector3 footPos = animator.GetIKPosition(foot);
-        
-        if (Physics.Raycast(footPos + Vector3.up, Vector3.down, 
-            out RaycastHit hit, rayDistance, groundLayer))
+        Vector3 footPosition = _animator.GetIKPosition(foot);
+        Vector3 rayOrigin = footPosition + Vector3.up;
+
+        if (!Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit,
+            _settings.RayDistance, _settings.GroundLayer))
         {
-            // 발 위치를 지면에 맞춤
-            Vector3 targetPos = hit.point + Vector3.up * footOffset;
-            animator.SetIKPosition(foot, targetPos);
-            
-            // 발 회전을 지면 기울기에 맞춤
-            Quaternion targetRot = Quaternion.LookRotation(
-                Vector3.ProjectOnPlane(transform.forward, hit.normal), 
-                hit.normal
-            );
-            animator.SetIKRotation(foot, targetRot);
-            animator.SetIKPositionWeight(foot, 1f);
-            animator.SetIKRotationWeight(oot, 1f);
+            _animator.SetIKPositionWeight(foot, 0f);
+            _animator.SetIKRotationWeight(foot, 0f);
+            _animator.SetIKHintPositionWeight(knee, 0f);
+            return;
         }
+
+        Vector3 targetPosition = hit.point + Vector3.up * _settings.FootOffset;
+        Quaternion targetRotation = Quaternion.LookRotation(
+            Vector3.ProjectOnPlane(transform.forward, hit.normal),
+            hit.normal);
+
+        _animator.SetIKPosition(foot, targetPosition);
+        _animator.SetIKRotation(foot, targetRotation);
+        _animator.SetIKPositionWeight(foot, 1f);
+        _animator.SetIKRotationWeight(foot, 1f);
+        _animator.SetIKHintPositionWeight(knee, 0.5f);
     }
 }
 ```
@@ -493,33 +642,35 @@ public class FootIK : MonoBehaviour
 ## 애니메이션 이벤트
 
 ```csharp
-public class AnimationEventHandler : MonoBehaviour
+public sealed class AnimationEventHandler : MonoBehaviour
 {
-    [SerializeField] private ParticleSystem attackEffect;
-    [SerializeField] private AudioSource audioSource;
-    
-    // 애니메이션 클립에서 호출할 이벤트
+    [SerializeField] private Animator _animator;
+    [SerializeField] private ParticleSystem _attackEffect;
+    [SerializeField] private AudioSource _audioSource;
+    [SerializeField] private AudioClip _attackSound;
+    [SerializeField] private AudioClip[] _footstepSounds;
+
     public void OnAttackHit()
     {
-        // 공격 판정 시점
-        attackEffect.Play();
-        audioSource.PlayOneShot(attackSound);
-        
-        // 데미지 적용
+        _attackEffect.Play();
+        _audioSource.PlayOneShot(_attackSound);
         DealDamageToTarget();
     }
-    
+
     public void OnFootstep()
     {
-        // 발소리 재생
-        AudioClip footstep = GetRandomFootstep();
-        audioSource.PlayOneShot(footstep, 0.5f);
+        AudioClip footstep = _footstepSounds[Random.Range(0, _footstepSounds.Length)];
+        _audioSource.PlayOneShot(footstep, 0.5f);
     }
-    
+
     public void OnAnimationComplete()
     {
-        // 애니메이션 종료 콜백
-        OnActionFinished?.Invoke();
+        _animator.SetTrigger("ActionFinished");
+    }
+
+    private void DealDamageToTarget()
+    {
+        // 공격 판정 시스템에 데미지 적용
     }
 }
 ```
@@ -529,28 +680,39 @@ public class AnimationEventHandler : MonoBehaviour
 ## 애니메이션 블렌딩
 
 ```csharp
-public class AnimationBlending : MonoBehaviour
+public sealed class AnimationBlending : MonoBehaviour
 {
-    private Animator animator;
-    private int locomotionBlendHash;
-    
-    void Start()
+    private readonly CompositeDisposable _disposables = new();
+    private Animator _animator;
+    private AnimationInputSource _inputSource;
+    private AnimationBlendingSettings _settings;
+    private int _locomotionBlendHash;
+
+    public ReactiveProperty<float> LocomotionSpeed { get; } = new(0f);
+
+    [Inject]
+    public void Construct(Animator animator, AnimationInputSource inputSource, AnimationBlendingSettings settings)
     {
-        animator = GetComponent<Animator>();
-        locomotionBlendHash = Animator.StringToHash("LocomotionBlend");
+        _animator = animator;
+        _inputSource = inputSource;
+        _settings = settings;
+        _locomotionBlendHash = Animator.StringToHash(settings.LocomotionBlendParameter);
     }
-    
-    void Update()
+
+    private void Start()
     {
-        float speed = new Vector3(
-            Input.GetAxis("Horizontal"), 
-            0, 
-            Input.GetAxis("Vertical")
-        ).magnitude;
-        
-        // Blend Tree 파라미터 업데이트
-        // 0 = Idle, 0.5 = Walk, 1 = Run
-        animator.SetFloat(locomotionBlendHash, speed, 0.1f, Time.deltaTime);
+        _inputSource.MoveInput
+            .Select(moveInput => Mathf.Clamp01(moveInput.magnitude))
+            .Subscribe(speed => LocomotionSpeed.Value = speed)
+            .AddTo(_disposables);
+
+        LocomotionSpeed
+            .Subscribe(speed => _animator.SetFloat(
+                _locomotionBlendHash,
+                speed,
+                _settings.DampTime,
+                Time.deltaTime))
+            .AddTo(_disposables);
     }
 }
 ```
@@ -560,33 +722,81 @@ public class AnimationBlending : MonoBehaviour
 ## 애니메이션 레이어 활용
 
 ```csharp
-public class LayeredAnimation : MonoBehaviour
+public sealed class LayeredAnimation : MonoBehaviour
 {
-    private Animator animator;
-    
-    void Start()
+    private Animator _animator;
+    private LayeredAnimationSettings _settings;
+    private MotionHandle _layerWeightHandle;
+
+    [Inject]
+    public void Construct(Animator animator, LayeredAnimationSettings settings)
     {
-        animator = GetComponent<Animator>();
-        
-        // 상체 레이어 설정 (무게 1)
-        animator.SetLayerWeight(1, 1f);
+        _animator = animator;
+        _settings = settings;
     }
-    
+
+    private void Start()
+    {
+        _animator.SetLayerWeight(_settings.UpperBodyLayerIndex, 1f);
+    }
+
     public void PlayUpperBodyAction(string actionName)
     {
-        // 레이어 1 (Upper Body)에서만 재생
-        // 하체는 기존 애니메이션 유지
-        animator.Play(actionName, 1, 0f);
+        _animator.Play(actionName, _settings.UpperBodyLayerIndex, 0f);
     }
-    
-    public void SetAiming(bool isAiming)
+
+    public async UniTask SetAimingAsync(bool isAiming)
     {
-        // 조준 레이어 블렌딩
         float targetWeight = isAiming ? 1f : 0f;
-        float currentWeight = animator.GetLayerWeight(2);
-        
-        // 부드러운 전환
-        StartCoroutine(BlendLayerWeight(2, currentWeight, targetWeight));
+        int layerIndex = _settings.AimingLayerIndex;
+        float currentWeight = _animator.GetLayerWeight(layerIndex);
+
+        if (_layerWeightHandle.IsActive())
+        {
+            _layerWeightHandle.Cancel();
+        }
+
+        _layerWeightHandle = LMotion.Create(currentWeight, targetWeight, _settings.BlendDuration)
+            .WithEase(Ease.OutQuad)
+            .WithOnUpdate(value => _animator.SetLayerWeight(layerIndex, value))
+            .RunWithoutBinding();
+
+        await _layerWeightHandle.ToUniTask();
+    }
+}
+```
+
+---
+
+## AnimationLifetimeScope 구성
+
+```csharp
+public sealed class AnimationLifetimeScope : LifetimeScope
+{
+    [SerializeField] private Animator _animator;
+    [SerializeField] private Transform _headTrackingTarget;
+    [SerializeField] private CharacterSkinChanger _characterSkinChanger;
+    [SerializeField] private WeaponAnimationSystem _weaponAnimationSystem;
+    [SerializeField] private BoneController _boneController;
+    [SerializeField] private HeadTracking _headTracking;
+    [SerializeField] private FootIK _footIK;
+    [SerializeField] private AnimationBlending _animationBlending;
+    [SerializeField] private LayeredAnimation _layeredAnimation;
+    // ... settings fields
+
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.RegisterInstance(_animator);
+        builder.RegisterInstance(_headTrackingTarget);
+        builder.Register<AnimationInputSource>(Lifetime.Singleton);
+
+        builder.RegisterComponent(_characterSkinChanger);
+        builder.RegisterComponent(_weaponAnimationSystem);
+        builder.RegisterComponent(_boneController);
+        builder.RegisterComponent(_headTracking);
+        builder.RegisterComponent(_footIK);
+        builder.RegisterComponent(_animationBlending);
+        builder.RegisterComponent(_layeredAnimation);
     }
 }
 ```
@@ -729,10 +939,11 @@ public class AnimationPostProcessor : AssetPostprocessor
 
 ```
 요구사항:
-□ MenuManager 싱글톤 구현
+□ MenuLifetimeScope (VContainer) 구현
+□ MenuViewModel로 R3 반응형 상태 관리
 □ 최소 3개의 화면 (Main, Settings, Game)
-□ 히스토리 관리 (뒤로 가기 기능)
-□ Fade + Slide 전환 효과
+□ 히스토리 관리 (뒤로 가기 기능, CanGoBack 파생 속성)
+□ Fade + Slide 전환 (LitMotion 트윈)
 
 채점 기준:
 - 화면 전환이 부드러운가?
@@ -748,8 +959,9 @@ public class AnimationPostProcessor : AssetPostprocessor
 요구사항:
 □ WeaponData ScriptableObject 생성
 □ 3가지 이상의 무기 타입
+□ ReactiveProperty<WeaponType>으로 무기 상태 관리
 □ Animator Override로 클립 교체
-□ 무기 장착/해제 애니메이션
+□ VContainer DI로 Animator 주입
 
 채점 기준:
 - 무기 교체가 자연스러운가?
@@ -763,10 +975,10 @@ public class AnimationPostProcessor : AssetPostprocessor
 
 ```
 요구사항:
-□ IK로 머리 방향 제어
+□ VContainer [Inject]로 Animator + 타겟 주입
+□ LitMotion으로 부드러운 회전 (Slerp 대신)
 □ 각도 제한 (±60도)
-□ 부드러운 보간
-□ 타겟 전환 기능
+□ 타겟 전환 시 MotionHandle 취소
 
 채점 기준:
 - 자연스러운 머리 움직임

@@ -1,68 +1,87 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using R3;
 using UnityEngine;
 using UnityEngine.UIElements;
+using VContainer;
+using VContainer.Unity;
 
 namespace Metroidvania.Menu
 {
-    public class MenuManager : MonoBehaviour
+    public sealed class MenuManager : IStartable, System.IDisposable
     {
-        [SerializeField] private UIDocument uiDocument;
-        [SerializeField] private MenuScreen[] menuScreens;
-        [SerializeField] private ScreenTransition defaultTransition;
+        private readonly UIDocument _uiDocument;
+        private readonly IReadOnlyList<IMenuScreen> _menuScreens;
+        private readonly ScreenTransition _defaultTransition;
+        private readonly MenuViewModel _viewModel;
+        private readonly Dictionary<string, IMenuScreen> _lookup = new();
+        private readonly DisposableBag _disposables = new();
 
-        private readonly Stack<MenuScreen> _history = new();
-        private readonly Dictionary<string, MenuScreen> _lookup = new();
-        private MenuScreen _currentScreen;
         private VisualElement _root;
+        private IMenuScreen _currentScreen;
 
-        private void Awake()
+        [Inject]
+        public MenuManager(
+            UIDocument uiDocument,
+            IReadOnlyList<IMenuScreen> menuScreens,
+            ScreenTransition defaultTransition,
+            MenuViewModel viewModel)
         {
-            _root = uiDocument.rootVisualElement;
-
-            foreach (MenuScreen screen in menuScreens)
-            {
-                screen.Bind(_root);
-                screen.Hide();
-                _lookup[screen.name] = screen;
-            }
+            _uiDocument = uiDocument;
+            _menuScreens = menuScreens;
+            _defaultTransition = defaultTransition;
+            _viewModel = viewModel;
         }
 
-        public async UniTask OpenScreenAsync(string screenName)
+        public void Start()
         {
-            if (!_lookup.TryGetValue(screenName, out MenuScreen target))
+            _root = _uiDocument.rootVisualElement;
+
+            foreach (IMenuScreen screen in _menuScreens)
+            {
+                VisualElement content = _root.Q<VisualElement>(screen.ContentElementName);
+                screen.Bind(content);
+                screen.Hide();
+                _lookup[screen.ScreenName] = screen;
+            }
+
+            _viewModel.CurrentScreenName
+                .Subscribe(screenName => OpenScreenAsync(screenName).Forget())
+                .AddTo(ref _disposables);
+        }
+
+        public void Dispose()
+        {
+            _disposables.Dispose();
+        }
+
+        private async UniTask OpenScreenAsync(string screenName)
+        {
+            if (string.IsNullOrWhiteSpace(screenName))
+            {
+                return;
+            }
+
+            if (!_lookup.TryGetValue(screenName, out IMenuScreen target))
+            {
+                Debug.LogWarning($"Menu screen '{screenName}' was not registered.");
+                return;
+            }
+
+            if (_currentScreen == target)
             {
                 return;
             }
 
             if (_currentScreen != null)
             {
-                await defaultTransition.AnimateOutAsync(_currentScreen.Content);
+                await _defaultTransition.AnimateOutAsync(_currentScreen.Content);
                 _currentScreen.Hide();
-                _history.Push(_currentScreen);
             }
 
             _currentScreen = target;
             _currentScreen.Show();
-            await defaultTransition.AnimateInAsync(_currentScreen.Content);
-        }
-
-        public async UniTask BackAsync()
-        {
-            if (_history.Count == 0)
-            {
-                return;
-            }
-
-            if (_currentScreen != null)
-            {
-                await defaultTransition.AnimateOutAsync(_currentScreen.Content);
-                _currentScreen.Hide();
-            }
-
-            _currentScreen = _history.Pop();
-            _currentScreen.Show();
-            await defaultTransition.AnimateInAsync(_currentScreen.Content);
+            await _defaultTransition.AnimateInAsync(_currentScreen.Content);
         }
     }
 }

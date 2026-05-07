@@ -135,38 +135,43 @@ public class Health : MonoBehaviour
 
 ```csharp
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.UIElements;
+using R3;
 
-public class HealthBar : MonoBehaviour
+public class HealthBarUI : MonoBehaviour
 {
+    [SerializeField] private UIDocument uiDocument;
     [SerializeField] private Health health;
-    [SerializeField] private Slider healthSlider;
-    [SerializeField] private Image fillImage;
     
-    [SerializeField] private Color fullHealthColor = Color.green;
-    [SerializeField] private Color lowHealthColor = Color.red;
-    [SerializeField] private float lowHealthThreshold = 0.3f;
+    private VisualElement _hpFill;
+    private Label _hpText;
+    private readonly CompositeDisposable _disposables = new();
     
     private void Start()
     {
-        health.OnHealthChanged += UpdateHealthBar;
-        UpdateHealthBar(health.GetCurrentHealth());
+        var root = uiDocument.rootVisualElement;
+        _hpFill = root.Q<VisualElement>("hp-fill");
+        _hpText = root.Q<Label>("hp-text");
+        
+        health.CurrentHealth
+            .Subscribe(UpdateHealthBar)
+            .AddTo(_disposables);
     }
     
     private void UpdateHealthBar(float currentHealth)
     {
-        float percent = health.GetHealthPercent();
-        healthSlider.value = percent;
+        float percent = health.HealthPercent;
+        _hpFill.style.width = Length.Percent(percent * 100f);
+        _hpText.text = $"{currentHealth:0} / {health.MaxHealth:0}";
         
-        // 색상 변화
-        fillImage.color = percent < lowHealthThreshold 
-            ? lowHealthColor 
-            : fullHealthColor;
+        _hpFill.style.backgroundColor = percent < 0.3f
+            ? new StyleColor(Color.red)
+            : new StyleColor(Color.green);
     }
     
     private void OnDestroy()
     {
-        health.OnHealthChanged -= UpdateHealthBar;
+        _disposables.Dispose();
     }
 }
 ```
@@ -176,10 +181,18 @@ public class HealthBar : MonoBehaviour
 # 무적(Invincibility) 시스템
 
 ```csharp
+using Cysharp.Threading.Tasks;
+
 public class Health : MonoBehaviour
 {
     [SerializeField] private float invincibilityDuration = 0.5f;
     private bool isInvincible = false;
+    private SpriteRenderer spriteRenderer;
+    
+    private void Awake()
+    {
+        spriteRenderer = GetComponent<SpriteRenderer>();
+    }
     
     public void TakeDamage(float damage)
     {
@@ -189,31 +202,28 @@ public class Health : MonoBehaviour
         
         if (currentHealth > 0)
         {
-            StartCoroutine(InvincibilityCoroutine());
+            InvincibilityAsync().Forget();
         }
     }
     
-    private System.Collections.IEnumerator InvincibilityCoroutine()
+    private async UniTaskVoid InvincibilityAsync()
     {
         isInvincible = true;
         
-        // 시각적 피드백: 깜빡임
-        SpriteRenderer sprite = GetComponent<SpriteRenderer>();
-        if (sprite != null)
+        if (spriteRenderer != null)
         {
-            float elapsed = 0f;
-            while (elapsed < invincibilityDuration)
+            int blinkCount = Mathf.CeilToInt(invincibilityDuration / 0.2f);
+            for (int i = 0; i < blinkCount; i++)
             {
-                sprite.color = new Color(1, 1, 1, 0.5f);
-                yield return new WaitForSeconds(0.1f);
-                sprite.color = Color.white;
-                yield return new WaitForSeconds(0.1f);
-                elapsed += 0.2f;
+                spriteRenderer.color = new Color(1, 1, 1, 0.5f);
+                await UniTask.Delay(100);
+                spriteRenderer.color = Color.white;
+                await UniTask.Delay(100);
             }
         }
         else
         {
-            yield return new WaitForSeconds(invincibilityDuration);
+            await UniTask.Delay((int)(invincibilityDuration * 1000));
         }
         
         isInvincible = false;
@@ -545,11 +555,14 @@ public class Hurtbox : MonoBehaviour
 # 공격 타이밍 제어
 
 ```csharp
+using Cysharp.Threading.Tasks;
+
 public class AttackController : MonoBehaviour
 {
     [SerializeField] private Hitbox hitbox;
     [SerializeField] private float attackCooldown = 0.5f;
     [SerializeField] private float hitboxActiveDuration = 0.2f;
+    [SerializeField] private float windupDuration = 0.1f;
     
     private float lastAttackTime;
     private bool canAttack = true;
@@ -559,10 +572,10 @@ public class AttackController : MonoBehaviour
         if (!canAttack) return;
         if (Time.time - lastAttackTime < attackCooldown) return;
         
-        StartCoroutine(AttackSequence());
+        AttackSequenceAsync().Forget();
     }
     
-    private System.Collections.IEnumerator AttackSequence()
+    public async UniTaskVoid AttackSequenceAsync()
     {
         canAttack = false;
         lastAttackTime = Time.time;
@@ -571,14 +584,19 @@ public class AttackController : MonoBehaviour
         // animator.SetTrigger("Attack");
         
         // 2. Hitbox 활성화 (애니메이션 이벤트로도 가능)
-        yield return new WaitForSeconds(0.1f); // 윈드업 시간
+        await UniTask.Delay((int)(windupDuration * 1000));
         hitbox.gameObject.SetActive(true);
         
-        yield return new WaitForSeconds(hitboxActiveDuration);
+        await UniTask.Delay((int)(hitboxActiveDuration * 1000));
         hitbox.gameObject.SetActive(false);
         
         // 3. 쿨다운
-        yield return new WaitForSeconds(attackCooldown - hitboxActiveDuration - 0.1f);
+        float remaining = attackCooldown - windupDuration - hitboxActiveDuration;
+        if (remaining > 0)
+        {
+            await UniTask.Delay((int)(remaining * 1000));
+        }
+
         canAttack = true;
     }
 }
@@ -702,6 +720,8 @@ public class AdvancedKnockback : MonoBehaviour
 # 넉백 + 히트스톱(Hitstop) 조합
 
 ```csharp
+using Cysharp.Threading.Tasks;
+
 public class CombatEffects : MonoBehaviour
 {
     [SerializeField] private TimeManager timeManager;
@@ -709,7 +729,7 @@ public class CombatEffects : MonoBehaviour
     // 히트스톱: 타격 순간 시간을 느리게
     public void ApplyHitstop(float duration = 0.1f, float timeScale = 0.1f)
     {
-        timeManager?.SlowMotion(timeScale, duration);
+        timeManager?.SlowMotionAsync(timeScale, duration);
     }
     
     // 넉백 + 히트스톱 통합
@@ -740,15 +760,10 @@ public class CombatEffects : MonoBehaviour
 // 간단한 TimeManager
 public class TimeManager : MonoBehaviour
 {
-    public void SlowMotion(float targetTimeScale, float duration)
+    public async UniTaskVoid SlowMotionAsync(float targetTimeScale, float duration)
     {
-        StartCoroutine(SlowMotionCoroutine(targetTimeScale, duration));
-    }
-    
-    private System.Collections.IEnumerator SlowMotionCoroutine(float target, float duration)
-    {
-        Time.timeScale = target;
-        yield return new WaitForSecondsRealtime(duration);
+        Time.timeScale = targetTimeScale;
+        await UniTask.Delay((int)(duration * 1000), ignoreTimeScale: true);
         Time.timeScale = 1f;
     }
 }

@@ -1,5 +1,5 @@
 using UnityEngine;
-using System.Collections;
+using Cysharp.Threading.Tasks;
 
 namespace Metroidvania.Combat
 {
@@ -25,27 +25,27 @@ namespace Metroidvania.Combat
         public void PerformAttack()
         {
             if (!canAttack || Time.time - lastAttackTime < attackCooldown) return;
-            StartCoroutine(AttackSequence());
+            AttackSequenceAsync().Forget();
         }
 
-        private IEnumerator AttackSequence()
+        private async UniTaskVoid AttackSequenceAsync()
         {
             canAttack = false;
             lastAttackTime = Time.time;
 
             // 1. Windup
-            yield return new WaitForSeconds(windupDuration);
+            await UniTask.WaitForSeconds(windupDuration);
 
             // 2. Hitbox Active
             hitbox.gameObject.SetActive(true);
-            yield return new WaitForSeconds(hitboxActiveDuration);
+            await UniTask.WaitForSeconds(hitboxActiveDuration);
             hitbox.gameObject.SetActive(false);
 
             // 3. Cooldown
             float remainingCooldown = attackCooldown - windupDuration - hitboxActiveDuration;
             if (remainingCooldown > 0)
             {
-                yield return new WaitForSeconds(remainingCooldown);
+                await UniTask.WaitForSeconds(remainingCooldown);
             }
 
             canAttack = true;

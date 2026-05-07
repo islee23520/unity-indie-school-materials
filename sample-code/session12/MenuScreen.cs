@@ -1,24 +1,36 @@
+using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Metroidvania.Menu
 {
-    public abstract class MenuScreen : MonoBehaviour
+    public interface IMenuScreen
     {
+        string ScreenName { get; }
+        string ContentElementName { get; }
+        VisualElement Content { get; }
+
+        void Bind(VisualElement content);
+        void Show();
+        void Hide();
+    }
+
+    [Serializable]
+    public sealed class MenuScreenDefinition : IMenuScreen
+    {
+        [SerializeField] private string screenName;
         [SerializeField] private string contentElementName;
 
+        public string ScreenName => screenName;
+        public string ContentElementName => contentElementName;
         public VisualElement Content { get; private set; }
 
-        public void Bind(VisualElement root)
+        public void Bind(VisualElement content)
         {
-            Content = root.Q<VisualElement>(contentElementName);
-            if (Content == null)
-            {
-                Debug.LogWarning($"UI Toolkit element '{contentElementName}' was not found.");
-            }
+            Content = content;
         }
 
-        public virtual void Show()
+        public void Show()
         {
             if (Content == null)
             {
@@ -26,21 +38,16 @@ namespace Metroidvania.Menu
             }
 
             Content.style.display = DisplayStyle.Flex;
-            OnShow();
         }
 
-        public virtual void Hide()
+        public void Hide()
         {
             if (Content == null)
             {
                 return;
             }
 
-            OnHide();
             Content.style.display = DisplayStyle.None;
         }
-
-        protected abstract void OnShow();
-        protected abstract void OnHide();
     }
 }

@@ -1,14 +1,17 @@
 using UnityEngine;
 using System;
+using R3;
 
 namespace Metroidvania.Combat
 {
-    public class Hurtbox : MonoBehaviour
+    public class Hurtbox : MonoBehaviour, IDisposable
     {
         [SerializeField] private Health health;
         [SerializeField] private Defense defense;
 
-        public event Action<DamageInfo> OnHit;
+        private readonly Subject<DamageInfo> _onHit = new();
+
+        public Observable<DamageInfo> OnHit => _onHit;
 
         private void Awake()
         {
@@ -30,8 +33,18 @@ namespace Metroidvania.Combat
                 health.TakeDamage(finalDamage);
             }
 
-            OnHit?.Invoke(damageInfo);
+            _onHit.OnNext(damageInfo);
             ApplyKnockback(damageInfo, finalDamage);
+        }
+
+        public void Dispose()
+        {
+            _onHit.Dispose();
+        }
+
+        private void OnDestroy()
+        {
+            Dispose();
         }
 
         private void ApplyKnockback(DamageInfo damageInfo, float finalDamage)

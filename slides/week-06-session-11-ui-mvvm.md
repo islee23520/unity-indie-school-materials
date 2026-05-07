@@ -271,24 +271,27 @@ public class PlayerData
 # ViewModel 예제
 
 ```csharp
-// ViewModel - UI 로직
-public class PlayerViewModel : INotifyPropertyChanged
+using R3;
+using UnityEngine;
+
+// ViewModel - R3 상태만 관리하고 View를 참조하지 않습니다.
+public class PlayerViewModel
 {
-    private PlayerData _data;
-    
-    public string DisplayName => _data.Name;
-    public string HealthText => $"{_data.Health} / {_data.MaxHealth}";
-    public float HealthPercent => _data.HealthPercent;
-    
-    public event PropertyChangedEventHandler PropertyChanged;
-    
+    public ReactiveProperty<string> PlayerName { get; } = new("Hero");
+    public ReactiveProperty<int> CurrentHP { get; } = new(100);
+    public ReactiveProperty<int> MaxHP { get; } = new(100);
+
+    public ReadOnlyReactiveProperty<float> HPPercent =>
+        CurrentHP.CombineLatest(MaxHP, (cur, max) => (float)cur / max)
+            .ToReadOnlyReactiveProperty();
+
+    public ReadOnlyReactiveProperty<string> HPText =>
+        CurrentHP.CombineLatest(MaxHP, (cur, max) => $"{cur} / {max}")
+            .ToReadOnlyReactiveProperty();
+
     public void TakeDamage(int amount)
     {
-        _data.Health -= amount;
-        PropertyChanged?.Invoke(this, 
-            new PropertyChangedEventArgs(nameof(HealthText)));
-        PropertyChanged?.Invoke(this, 
-            new PropertyChangedEventArgs(nameof(HealthPercent)));
+        CurrentHP.Value = Mathf.Max(0, CurrentHP.Value - amount);
     }
 }
 ```
@@ -302,7 +305,9 @@ public class PlayerViewModel : INotifyPropertyChanged
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <ui:VisualElement class="player-panel">
         <ui:Label name="player-name" class="name-label" />
-        <ui:ProgressBar name="health-bar" low-value="0" high-value="1" />
+        <ui:VisualElement name="health-bar" class="health-bar">
+            <ui:VisualElement name="hp-fill" class="hp-fill" />
+        </ui:VisualElement>
         <ui:Label name="health-text" class="health-label" />
         <ui:Button name="damage-btn" text="데미지 테스트" />
     </ui:VisualElement>
@@ -314,27 +319,51 @@ public class PlayerViewModel : INotifyPropertyChanged
 # 바인딩 연결
 
 ```csharp
+using R3;
+using UnityEngine;
+using UnityEngine.UIElements;
+using VContainer;
+
 public class PlayerUIView : MonoBehaviour
 {
     [SerializeField] private UIDocument uiDocument;
-    [SerializeField] private PlayerViewModel viewModel;
-    
-    void Start()
+
+    [Inject]
+    private readonly PlayerViewModel viewModel;
+
+    private readonly CompositeDisposable _disposables = new();
+
+    private void Start()
     {
         var root = uiDocument.rootVisualElement;
-        
-        // 데이터 바인딩
-        root.Q<Label>("player-name").BindTo(viewModel, 
-            nameof(viewModel.DisplayName));
-        root.Q<ProgressBar>("health-bar").BindTo(viewModel, 
-            nameof(viewModel.HealthPercent));
-        root.Q<Label>("health-text").BindTo(viewModel, 
-            nameof(viewModel.HealthText));
-        
-        // 버튼 이벤트
-        root.Q<Button>("damage-btn").clicked += () => {
+        var nameLabel = root.Q<Label>("player-name");
+        var healthBar = root.Q<VisualElement>("hp-fill");
+        var healthText = root.Q<Label>("health-text");
+
+        viewModel.PlayerName
+            .Subscribe(name => nameLabel.text = name)
+            .AddTo(_disposables);
+
+        viewModel.HPPercent
+            .Subscribe(percent =>
+            {
+                healthBar.style.width = Length.Percent(percent * 100f);
+            })
+            .AddTo(_disposables);
+
+        viewModel.HPText
+            .Subscribe(text => healthText.text = text)
+            .AddTo(_disposables);
+
+        root.Q<Button>("damage-btn").clicked += () =>
+        {
             viewModel.TakeDamage(10);
         };
+    }
+
+    private void OnDestroy()
+    {
+        _disposables.Dispose();
     }
 }
 ```
@@ -390,13 +419,22 @@ viewModel.ScoreText.Subscribe(text => {
 using LitMotion;
 using LitMotion.Extensions;
 
-// UI 요소 이동
-LMotion.Create(Vector2.zero, Vector2.one * 100f, 0.5f)
-    .BindToAnchoredPosition(rectTransform);
+// UI Toolkit 요소 이동
+VisualElement panel = root.Q<VisualElement>("main-panel");
+LMotion.Create(-500f, 0f, 0.5f)
+    .WithEase(Ease.OutBack)
+    .BindWithState(panel, (value, element) =>
+    {
+        element.style.translate = new Translate(value, 0);
+    });
 
-// 알파값 변경
+// UI Toolkit 알파값 변경
 LMotion.Create(0f, 1f, 0.3f)
-    .BindToGraphicAlpha(image);
+    .WithEase(Ease.OutQuad)
+    .BindWithState(panel, (value, element) =>
+    {
+        element.style.opacity = value;
+    });
 ```
 
 ---
@@ -455,23 +493,34 @@ LMotion.Create(start, end, duration)
 
 ```csharp
 // 순차 애니메이션
+VisualElement panel = root.Q<VisualElement>("main-panel");
+
 var sequence = LSequence.Create()
     // 1. 페이드 인
     .Append(LMotion.Create(0f, 1f, 0.3f)
-        .BindToGraphicAlpha(image))
-    
+        .BindWithState(panel, (value, element) =>
+        {
+            element.style.opacity = value;
+        }))
+
     // 2. 0.2초 대기
     .AppendInterval(0.2f)
-    
+
     // 3. 위치 이동
-    .Append(LMotion.Create(Vector2.zero, targetPos, 0.5f)
+    .Append(LMotion.Create(-500f, 0f, 0.5f)
         .WithEase(Ease.OutBack)
-        .BindToAnchoredPosition(transform))
-    
-    // 4. 동시에 회전
-    .Join(LMotion.Create(0f, 360f, 0.5f)
-        .BindToEulerAnglesZ(transform))
-    
+        .BindWithState(panel, (value, element) =>
+        {
+            element.style.translate = new Translate(value, 0);
+        }))
+
+    // 4. 동시에 크기 변경
+    .Join(LMotion.Create(0.9f, 1f, 0.5f)
+        .BindWithState(panel, (value, element) =>
+        {
+            element.style.scale = new Scale(new Vector2(value, value));
+        }))
+
     .Run();
 ```
 
