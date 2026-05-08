@@ -78,4 +78,5 @@ rendered/
 
 AGENTS.md
 
-#.playwright-mcp
+# Playwright generated files
+.playwright-mcp

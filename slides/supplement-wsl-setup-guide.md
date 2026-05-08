@@ -8,19 +8,18 @@ paginate: true
 
 # Windows WSL AI 코딩 환경 설정 가이드
 
-## WSL2에서 AI 코딩 툴과 하네싱 툴 준비하기
+## WSL2에서 AI 코딩 툴 설치하기
 
-Windows PC에서 Linux 기반 개발 환경을 만들고 Codex, Claude Code, OpenCode, Gemini CLI, OMO, OMX, OMC, LUX를 설치합니다.
+Windows PC에서 Linux 기반 개발 환경을 만들고 Codex, Claude Code, OpenCode를 설치합니다.
 
 ---
 
 ## 전체 진행 순서
 
 1. WSL2를 이해하고 Windows에 Ubuntu를 설치합니다.
-2. Linux 기본 패키지, Node.js, Rust/Cargo를 준비합니다.
-3. AI 코딩 CLI를 하나씩 설치하고 인증합니다.
-4. 하네싱 툴을 설치해 에이전트 워크플로우를 확장합니다.
-5. WSL에서 자주 만나는 문제를 점검합니다.
+2. Linux 기본 패키지와 Node.js를 준비합니다.
+3. AI 코딩 CLI를 하나씩 설치합니다.
+4. WSL에서 자주 만나는 문제를 점검합니다.
 
 ---
 
@@ -134,87 +133,19 @@ git config --global user.name "Your Name"
 
 ---
 
-## 10. Git 이메일 설정
-
-GitHub에서 사용하는 이메일 또는 noreply 이메일을 설정합니다.
-
-```bash
-git config --global user.email "your-email@example.com"
-```
-
-설정 후 `git config --global --list`로 결과를 확인할 수 있습니다.
-
----
-
-## 11. Node.js 최신 버전 준비: nvm 설치
+## 10. Node.js 최신 버전 준비: nvm 설치
 
 Ubuntu 기본 Node.js는 버전이 낮을 수 있으므로 nvm을 사용합니다.
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
-```
-
-설치 후 새 터미널을 열거나 shell 설정을 다시 불러옵니다.
-
----
-
-## 12. nvm 설정 다시 불러오기
-
-현재 터미널에서 바로 nvm을 사용하려면 `.bashrc`를 다시 로드합니다.
-
-```bash
 source ~/.bashrc
-```
-
-zsh를 사용한다면 `~/.zshrc`에 nvm 초기화 코드가 들어갔는지 확인합니다.
-
----
-
-## 13. Node.js LTS 설치
-
-AI CLI 대부분은 최신 LTS Node.js에서 안정적으로 동작합니다.
-
-```bash
 nvm install --lts
+nvm use --lts
+nvm alias default lts/*
 ```
 
 설치가 끝나면 `node --version`과 `npm --version`으로 확인합니다.
-
----
-
-## 14. Node.js LTS 사용 설정
-
-현재 터미널에서 LTS 버전을 사용하도록 전환합니다.
-
-```bash
-nvm use --lts
-```
-
-필요하면 `nvm alias default lts/*`로 기본 버전도 지정합니다.
-
----
-
-## 15. Rust/Cargo 설치: LUX 준비
-
-LUX Rust gateway CLI 빌드를 위해 Rust toolchain을 설치합니다.
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-설치 중 기본 옵션을 선택하면 일반적인 개발 환경에 충분합니다.
-
----
-
-## 16. Cargo 환경 변수 적용
-
-현재 터미널에서 `cargo` 명령을 바로 사용하도록 환경을 불러옵니다.
-
-```bash
-source $HOME/.cargo/env
-```
-
-확인은 `rustc --version` 또는 `cargo --version`으로 진행합니다.
 
 ---
 
@@ -224,7 +155,7 @@ WSL 터미널에서 사용할 AI 코딩 CLI를 설치합니다.
 
 ---
 
-## 17. OpenAI Codex CLI 설치
+## 11. OpenAI Codex CLI 설치
 
 npm 전역 패키지로 Codex CLI를 설치합니다.
 
@@ -236,19 +167,7 @@ npm install -g @openai/codex
 
 ---
 
-## 18. OpenAI API Key 설정
-
-현재 터미널 세션에서 API key를 환경 변수로 설정합니다.
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-지속 설정이 필요하면 `~/.bashrc` 또는 `~/.zshrc`에 추가하되, 공유 저장소에는 절대 커밋하지 않습니다.
-
----
-
-## 19. Claude Code 설치
+## 12. Claude Code 설치
 
 Claude Code 설치 스크립트를 실행합니다.
 
@@ -260,19 +179,7 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 ---
 
-## 20. Claude Code 인증
-
-브라우저 인증 흐름을 통해 Claude 계정에 로그인합니다.
-
-```bash
-claude auth login
-```
-
-WSL에서 브라우저가 열리지 않으면 출력되는 URL을 Windows 브라우저에 복사해 진행합니다.
-
----
-
-## 21. OpenCode 설치
+## 13. OpenCode 설치
 
 OpenCode를 npm 전역 패키지로 설치합니다.
 
@@ -280,167 +187,167 @@ OpenCode를 npm 전역 패키지로 설치합니다.
 npm install -g opencode
 ```
 
-프로젝트별 설정을 만들기 전 `opencode --help`로 설치를 확인합니다.
+설치 후 `opencode --help`로 설치를 확인합니다.
 
 ---
 
-## 22. OpenCode 초기 설정
+## 14. 설치 확인
 
-작업할 프로젝트 루트에서 OpenCode 설정을 초기화합니다.
+각 CLI가 PATH에 잡혔는지 확인합니다.
 
 ```bash
-opencode init
+codex --help
+claude --help
+opencode --help
 ```
 
-설정 파일에는 모델, provider, 로컬 규칙을 프로젝트 정책에 맞게 정리합니다.
+세 명령 모두 정상적으로 도움말이 출력되면 설치가 완료된 것입니다.
 
 ---
 
-## 23. Gemini CLI 설치 후보 1
+# Part 3: 트러블슈팅
 
-환경에 따라 Anthropic namespace 패키지를 사용하는 안내가 있을 수 있습니다.
+WSL에서 자주 발생하는 문제와 해결 방법입니다.
+
+---
+
+## 15. 명령을 찾지 못할 때: PATH 확인
+
+설치했는데 `command not found`가 나오면 PATH가 제대로 설정되지 않은 것입니다.
 
 ```bash
-npm install -g @anthropic-ai/gemini-cli
+which node
+echo $PATH
 ```
 
-패키지 이름은 배포 시점에 바뀔 수 있으므로 설치 실패 시 공식 문서를 확인합니다.
+`which` 명령으로 해당 실행 파일의 실제 위치를 찾고, 그 경로가 `$PATH`에 포함되어 있는지 확인합니다.
 
 ---
 
-## 24. Gemini CLI 설치 후보 2
+## 16. nvm과 apt Node.js 충돌 해결
 
-Google namespace 패키지를 사용하는 경우 다음 명령을 사용합니다.
+`apt`로 설치한 Node.js와 `nvm`으로 설치한 Node.js가 충돌하면 `npm install -g`가 잘못된 위치에 설치됩니다.
+
+**증상**: `codex --version`이 안 되거나, `npm -g list`에 패키지가 안 보임
+
+**원인**: `which node`와 `which npm`이 서로 다른 경로를 가리킴
 
 ```bash
-npm install -g @google/gemini-cli
+# 현재 어떤 node를 쓰고 있는지 확인
+which node
+# /usr/bin/node (apt) ← 문제
+
+which npm
+# /usr/bin/npm (apt) ← 문제
 ```
 
-설치 후 `gemini --help` 또는 패키지가 안내하는 실행 명령으로 확인합니다.
-
----
-
-# Part 3: 하네싱 툴 설치
-
-여러 AI CLI 위에 워크플로우, 모드, 에이전트 구성을 얹는 도구를 설치합니다.
-
----
-
-## 25. OMO 설치: oh-my-openagent
-
-OpenCode 계열 환경을 확장하려면 OMO 설치 명령을 실행합니다.
+**해결 1단계**: apt Node.js를 제거합니다.
 
 ```bash
-bunx oh-my-opencode install
+sudo apt remove -y nodejs npm
 ```
 
-Bun이 없다면 먼저 Bun을 설치하거나 npm 기반 설치를 사용합니다.
-
----
-
-## 26. OMO npm 설치 대안
-
-전역 npm 패키지로 oh-my-openagent를 설치할 수 있습니다.
+**해결 2단계**: nvm의 Node.js가 PATH 우선이 되도록 합니다.
 
 ```bash
-npm install -g oh-my-openagent
+source ~/.bashrc
+nvm use --lts
+which node
+# /home/username/.nvm/versions/node/vXX.X.X/bin/node (nvm) ← 정상
 ```
 
-설치 후 프로젝트 정책에 맞게 agent, category, model routing 설정을 확인합니다.
-
----
-
-## 27. OMX 설치: oh-my-codex
-
-Codex와 OMX를 함께 전역 설치합니다.
+**해결 3단계**: CLI를 다시 설치합니다.
 
 ```bash
-npm install -g @openai/codex oh-my-codex
+npm install -g @openai/codex
+codex --help
 ```
 
-이미 Codex가 설치되어 있어도 같은 명령으로 버전을 맞출 수 있습니다.
+`which npm`이 nvm 경로를 가리키지 않으면 슬라이드 15의 PATH 설정을 다시 확인하세요.
 
 ---
 
-## 28. OMX 실행 확인
+## 17. nvm 설치 후 node를 찾지 못할 때
 
-고성능 모드 예시로 OMX를 실행합니다.
+새 터미널에서 `node`가 안 잡히면 shell 설정 파일을 확인합니다.
 
 ```bash
-omx --madmax --high
+# ~/.bashrc 끝에 nvm 초기화 코드가 있는지 확인
+grep nvm ~/.bashrc
 ```
 
-처음 실행할 때는 API key와 프로젝트 권한 설정을 다시 확인합니다.
-
----
-
-## 29. OMC 설치: Claude Code 플러그인 마켓
-
-Claude Code 내부 명령에서 플러그인 마켓을 추가합니다.
+없으면 nvm 설치 스크립트가 정상 실행되지 않은 것입니다. 다시 설치합니다.
 
 ```bash
-/plugin marketplace add https://github.com/Yeachan-Heo/oh-my-claudecode
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+source ~/.bashrc
 ```
 
-이 명령은 Claude Code 세션 안에서 실행하는 명령입니다.
+zsh를 쓴다면 `~/.zshrc`를 확인합니다.
 
 ---
 
-## 30. OMC 플러그인 설치
+## 18. npm 전역 설치 위치: EACCES 에러
 
-추가한 마켓에서 oh-my-claudecode를 설치합니다.
+`npm install -g`에서 권한 에러가 나면 npm의 전역 설치 경로를 사용자 디렉터리로 바꿉니다.
 
 ```bash
-/plugin install oh-my-claudecode
+mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
 ```
 
-설치 후 Claude Code를 재시작하고 플러그인 명령이 보이는지 확인합니다.
-
----
-
-## 31. OMC npm 설치 대안
-
-Sisyphus 패키지를 npm 전역으로 설치하는 대안도 있습니다.
+그 다음 shell 설정 파일에 PATH를 추가합니다.
 
 ```bash
-npm i -g oh-my-claude-sisyphus@latest
+# ~/.bashrc 또는 ~/.zshrc에 추가
+export PATH="$HOME/.npm-global/bin:$PATH"
+source ~/.bashrc
 ```
 
-팀에서 사용하는 표준 방식이 있으면 한 가지 방식으로 통일합니다.
+이후 `npm install -g` 명령이 `sudo` 없이 동작합니다.
 
 ---
 
-## 32. LUX 설치 위치 확인
+## 19. sudo 없이 Docker를 쓰고 싶을 때: usermod
 
-LUX는 Unity 프로젝트의 패키지 내부 Rust gateway를 기준으로 설치합니다.
+Docker를 설치했는데 매번 `sudo docker`를 써야 한다면 사용자를 `docker` 그룹에 추가합니다.
 
 ```bash
-cargo install --path Packages/com.linalab.lux/RustGateway~ --force --locked
+sudo usermod -aG docker $USER
 ```
 
-이 명령은 해당 `Packages/com.linalab.lux/RustGateway~` 경로가 있는 Unity 프로젝트 루트에서 실행합니다.
+`-aG`는 기존 그룹을 유지하면서(`-a`) 새 그룹에 추가(`-G`)하는 옵션입니다. `usermod -G docker $USER`만 쓰면 다른 그룹에서 빠지게 되니 반드시 `-a`를 함께 씁니다.
 
----
-
-## 33. LUX 설치 확인
-
-설치된 LUX CLI 버전을 확인합니다.
+적용하려면 WSL을 재시작합니다.
 
 ```bash
-lux --version
+# WSL 종료 후 다시 실행
+wsl --shutdown
+wsl
 ```
 
-명령을 찾지 못하면 `$HOME/.cargo/bin`이 PATH에 포함되어 있는지 확인합니다.
+재시작 후 `docker ps`가 `sudo` 없이 동작하면 성공입니다.
 
 ---
 
-# Part 4: 트러블슈팅
+## 20. 그룹 권한 확인: groups 명령
 
-WSL에서 자주 발생하는 문제를 빠르게 분리합니다.
+현재 사용자가 속한 그룹을 확인합니다.
+
+```bash
+groups
+```
+
+Docker, dialout, sudo 등 필요한 그룹이 포함되어 있는지 확인합니다. 누락된 그룹이 있으면 `usermod -aG`로 추가합니다.
+
+```bash
+# 시리얼 포트 접근이 필요할 때
+sudo usermod -aG dialout $USER
+```
 
 ---
 
-## 34. WSL2 네트워크 이슈: DNS 확인
+## 21. 네트워크 이슈: DNS 확인
 
 패키지 설치가 느리거나 실패하면 DNS 응답부터 확인합니다.
 
@@ -450,21 +357,47 @@ nslookup github.com
 
 응답이 없으면 Windows 네트워크, VPN, 회사 proxy, WSL DNS 설정을 순서대로 확인합니다.
 
+WSL의 DNS를 수동으로 설정할 수도 있습니다.
+
+```bash
+# /etc/wsl.conf에 DNS 설정 추가
+sudo tee /etc/wsl.conf > /dev/null <<EOF
+[network]
+generateResolvConf = false
+EOF
+
+# DNS 서버 수동 지정
+sudo tee /etc/resolv.conf > /dev/null <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+```
+
+설정 후 `wsl --shutdown`으로 WSL을 재시작합니다.
+
 ---
 
-## 35. WSL2 네트워크 이슈: Proxy 설정
+## 22. 네트워크 이슈: Proxy 설정
 
 proxy가 필요한 환경에서는 shell 환경 변수를 설정합니다.
 
 ```bash
 export HTTPS_PROXY="http://proxy.example.com:8080"
+export HTTP_PROXY="http://proxy.example.com:8080"
 ```
 
-필요하면 `HTTP_PROXY`도 함께 설정하고, 인증 정보가 포함된 값은 공유하지 않습니다.
+npm에도 proxy를 설정해야 할 수 있습니다.
+
+```bash
+npm config set proxy http://proxy.example.com:8080
+npm config set https-proxy http://proxy.example.com:8080
+```
+
+영구 설정이 필요하면 `~/.bashrc`에 `export` 줄을 추가합니다.
 
 ---
 
-## 36. 권한 문제: 실행 권한 부여
+## 22. 권한 문제: 실행 권한 부여
 
 다운로드한 스크립트나 로컬 CLI가 실행되지 않으면 실행 권한을 확인합니다.
 
@@ -476,9 +409,9 @@ chmod +x ./script.sh
 
 ---
 
-## 37. 권한 문제: 파일 소유권 복구
+## 23. 권한 문제: 파일 소유권 복구
 
-실수로 root 소유 파일이 생겼다면 현재 사용자로 되돌립니다.
+실수로 `sudo`로 파일을 만들었거나 root 소유 파일이 생겼다면 현재 사용자로 되돌립니다.
 
 ```bash
 sudo chown -R $USER:$USER .
@@ -488,19 +421,36 @@ sudo chown -R $USER:$USER .
 
 ---
 
-## 38. GUI 앱 접근: WSLg 확인
+## 24. 권한 문제: sudo 없이 시스템 포트 사용
 
-Windows 11의 WSLg는 Linux GUI 앱 실행을 지원합니다.
+1024 이하 포트(80, 443)를 `sudo` 없이 쓰고 싶으면 리다이렉트로 우회합니다.
 
 ```bash
-xeyes
+# 8080으로 서버를 띄우고 80 포트로 포워딩
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
 ```
 
-`xeyes`가 없다면 `sudo apt install -y x11-apps`로 테스트 도구를 설치할 수 있습니다.
+보통은 개발 서버를 3000, 8080 등 1024 이상 포트에서 띄우는 것으로 충분합니다.
 
 ---
 
-## 39. 파일 시스템 성능: 작업 위치 선택
+## 25. WSL 재시작으로 설정 적용
+
+시스템 설정 변경 후 WSL을 재시작합니다.
+
+```bash
+# Windows PowerShell에서
+wsl --shutdown
+wsl
+```
+
+`wsl --shutdown`은 모든 WSL 인스턴스를 종료합니다. 열려 있는 터미널이 있으면 먼저 저장하세요.
+
+네트워크, 그룹 권한, `/etc/wsl.conf` 변경은 재시작 후에 적용됩니다.
+
+---
+
+## 26. 파일 시스템 성능: 작업 위치 선택
 
 WSL에서 Node.js와 Git 작업은 Linux 홈 디렉터리 아래가 빠릅니다.
 
@@ -512,70 +462,61 @@ mkdir -p ~/workspace
 
 ---
 
-## 40. Windows 파일 접근이 필요한 경우
+## 27. Windows PATH가 WSL에 유출되는 문제
 
-Windows 사용자 폴더는 `/mnt/c/Users/...` 경로로 접근합니다.
+WSL 터미널에서 `which node`가 Windows 쪽 경로를 가리키면 Windows PATH가 WSL로 유출된 것입니다.
 
 ```bash
-ls /mnt/c/Users
+# /etc/wsl.conf에 PATH 유출 방지 설정
+sudo tee /etc/wsl.conf > /dev/null <<EOF
+[interop]
+appendWindowsPath = false
+EOF
 ```
 
-대용량 프로젝트는 Windows 경로에서 직접 개발하지 말고 WSL 홈으로 복사해서 작업합니다.
+이후 `wsl --shutdown` 후 재시작하면 WSL이 순수 Linux PATH만 사용합니다. 단, Windows 실행 파일(`code.exe`, `explorer.exe` 등)을 WSL에서 직접 호출하려면 유출을 켜두어야 합니다.
 
 ---
 
-## 41. PATH 설정: bash
+## 28. 터미널 환경 변수 테스트
 
-bash 사용자는 `~/.bashrc`에 CLI 경로를 추가합니다.
+설정이 제대로 적용되었는지 터미널에서 확인합니다.
 
 ```bash
-export PATH="$HOME/.cargo/bin:$PATH"
+# Node.js 경로 확인
+which node && node --version
+
+# npm 전역 패키지 경로 확인
+npm root -g
+
+# shell 설정 파일에 PATH가 있는지 확인
+grep -n "PATH" ~/.bashrc
+
+# 현재 사용자와 그룹 확인
+id
 ```
 
-설정 후 `source ~/.bashrc`를 실행하거나 터미널을 새로 엽니다.
+`id` 명령은 사용자 UID, 기본 GID, 속한 그룹을 모두 보여줍니다.
 
 ---
 
-## 42. PATH 설정: zsh
-
-zsh 사용자는 `~/.zshrc`에 동일한 PATH 설정을 추가합니다.
-
-```bash
-export PATH="$HOME/.cargo/bin:$PATH"
-```
-
-shell 종류는 `echo $SHELL`로 확인합니다.
-
----
-
-## 43. 최종 설치 확인 체크리스트
+## 29. 최종 설치 확인 체크리스트
 
 아래 항목을 순서대로 확인합니다.
 
 1. `wsl -l -v`에서 Ubuntu가 VERSION 2로 표시됩니다.
-2. `node --version`, `npm --version`, `cargo --version`이 정상 출력됩니다.
+2. `node --version`, `npm --version`이 정상 출력됩니다.
 3. `git config --global --list`에 이름과 이메일이 있습니다.
-4. AI CLI의 `--help` 명령이 동작합니다.
-5. 프로젝트 파일은 WSL 홈 디렉터리 아래에 있습니다.
-
----
-
-## 44. 최소 동작 확인 명령
-
-마지막으로 주요 CLI 명령이 PATH에 잡혔는지 확인합니다.
-
-```bash
-codex --help
-```
-
-각 도구도 같은 방식으로 `claude --help`, `opencode --help`, `gemini --help`, `lux --version`을 확인합니다.
+4. `codex --help`, `claude --help`, `opencode --help`가 동작합니다.
+5. `npm install -g`가 `sudo` 없이 동작합니다.
+6. 프로젝트 파일은 WSL 홈 디렉터리 아래에 있습니다.
 
 ---
 
 ## 마무리
 
-이제 Windows에서는 Unity와 브라우저를 사용하고, WSL2에서는 Git, Node.js, Rust, AI 코딩 CLI를 실행할 수 있습니다.
+이제 Windows에서는 Unity와 브라우저를 사용하고, WSL2에서는 Git, Node.js, AI 코딩 CLI를 실행할 수 있습니다.
 
 1. 새 프로젝트는 `~/workspace` 아래에 둡니다.
-2. API key와 토큰은 shell 환경 변수나 안전한 secret store에 보관합니다.
+2. 각 AI CLI의 인증(API key, 브라우저 로그인 등)은 해당 도구의 공식 문서를 참고해 설정합니다.
 3. 설치 명령이 실패하면 네트워크, PATH, 권한, 실행 위치를 순서대로 점검합니다.
